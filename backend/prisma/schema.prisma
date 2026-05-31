@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String               @id @default(uuid()) @db.Uuid
+  firstName           String
+  lastName            String?
+  email               String               @unique
+  phone               String?
+  passwordHash        String?
+  googleSub           String?              @unique
+  role                String               @default("user")
+  isActive            Boolean              @default(true)
+  newsletter          Boolean              @default(true)
+  language            String               @default("ENGLISH")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  addresses           Address[]
+  cartItems           CartItem[]
+  orders              Order[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model Address {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  label     String?  @default("Home")
+  name      String
+  phone     String
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  pincode   String
+  country   String   @default("India")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String    @unique
+  description String?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  isDynamic   Boolean   @default(false)
+  parent      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id              String      @id @default(uuid()) @db.Uuid
+  categoryId      String?     @db.Uuid
+  name            String
+  slug            String      @unique
+  description     String?
+  images          String[]    @default([])
+  secondaryImage  String?
+  details         Json?
+  composition     String?
+  care            String?
+  sizes           Json?
+  colors          Json?
+  price           Decimal     @db.Decimal(10, 2)
+  discountedPrice Decimal?    @db.Decimal(10, 2)
+  stock           Int         @default(0)
+  sku             String?     @unique
+  isActive        Boolean     @default(true)
+  location        String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  category        Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+
+  @@map("products")
+}
+
+model CartItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid
+  productId         String   @db.Uuid
+  selectedSize      String
+  selectedColorName String
+  selectedColorHex  String
+  quantity          Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, selectedSize, selectedColorName])
+  @@map("cart_items")
+}
+
+model Coupon {
+  id            String   @id @default(uuid()) @db.Uuid
+  code          String   @unique
+  type          String
+  value         Decimal  @db.Decimal(10, 2)
+  minOrderValue Decimal  @default(0) @db.Decimal(10, 2)
+  maxDiscount   Decimal? @db.Decimal(10, 2)
+  usageLimit    Int?
+  usedCount     Int      @default(0)
+  isActive      Boolean  @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  orders        Order[]
+
+  @@map("coupons")
+}
+
+model Order {
+  id                String               @id @default(uuid()) @db.Uuid
+  publicId          String               @unique
+  userId            String               @db.Uuid
+  addressSnapshot   Json
+  status            String               @default("pending")
+  subtotal          Decimal              @db.Decimal(10, 2)
+  couponId          String?              @db.Uuid
+  couponCode        String?
+  couponDiscount    Decimal              @default(0) @db.Decimal(10, 2)
+  deliveryFee       Decimal              @default(0) @db.Decimal(10, 2)
+  gstPercentage     Decimal              @default(18) @db.Decimal(5, 2)
+  gstAmount         Decimal              @default(0) @db.Decimal(10, 2)
+  total             Decimal              @db.Decimal(10, 2)
+  paymentStatus     String               @default("pending")
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  razorpaySignature String?
+  trackingUrl       String?
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon            Coupon?              @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items             OrderItem[]
+  transactions      PaymentTransaction[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                String   @id @default(uuid()) @db.Uuid
+  orderId           String   @db.Uuid
+  productId         String?  @db.Uuid
+  name              String
+  imageUrl          String?
+  price             Decimal  @db.Decimal(10, 2)
+  quantity          Int
+  selectedSize      String?
+  selectedColorName String?
+  selectedColorHex  String?
+  subtotal          Decimal  @db.Decimal(10, 2)
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product           Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@map("order_items")
+}
+
+model PaymentTransaction {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderId     String?  @db.Uuid
+  gatewayId   String?
+  amount      Decimal  @db.Decimal(10, 2)
+  currency    String   @default("INR")
+  method      String?
+  status      String
+  createdAt   DateTime @default(now())
+  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@map("payment_transactions")
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}

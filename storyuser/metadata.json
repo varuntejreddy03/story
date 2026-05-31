@@ -1,0 +1,6 @@
+{
+  "name": "STORY",
+  "description": "Editorial Minimalism Ecommerce digital showcase for STORY boutique clothing and accessories collection",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

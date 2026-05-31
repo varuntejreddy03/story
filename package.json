@@ -1,0 +1,19 @@
+{
+  "name": "story-india-ecommerce",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:stop && npm run dev:run",
+    "dev:run": "concurrently -k -n BACKEND,STORE,ADMIN -c cyan,white,gray \"npm --prefix backend run dev\" \"npm --prefix storyuser run dev\" \"npm --prefix story-luxury-admin run dev\"",
+    "dev:stop": "node scripts/stop-dev-ports.mjs",
+    "start:all": "npm run dev",
+    "install:all": "npm install --prefix backend && npm install --prefix storyuser && npm install --prefix story-luxury-admin && npm install",
+    "build": "npm --prefix storyuser run build && npm --prefix story-luxury-admin run build",
+    "lint": "npm --prefix storyuser run lint && npm --prefix story-luxury-admin run lint",
+    "backend:migrate": "npm --prefix backend run prisma:migrate -- --name init",
+    "backend:seed": "npm --prefix backend run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

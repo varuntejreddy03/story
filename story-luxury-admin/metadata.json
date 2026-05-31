@@ -1,0 +1,6 @@
+{
+  "name": "STORY Luxury Admin",
+  "description": "A distinctive and highly polished administrative workspace for managing luxury apparel orders, products, inventory, customers, payments, categories, coupons, and configurations with precision styling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
