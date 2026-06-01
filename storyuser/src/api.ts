@@ -85,12 +85,18 @@ const mapUser = (user: any): UserProfile & { id?: string; role?: string } => ({
   newsletter: Boolean(user.newsletter)
 });
 
+const listFromSetting = (value: unknown, fallback: string[] = []) => {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value !== 'string') return fallback;
+  return value.split(',').map((item) => item.trim()).filter(Boolean);
+};
+
 const mapStorefrontContent = (settings: any): StorefrontContent => ({
-  heroEyebrow: settings.home_hero_eyebrow || 'New editorial capsule',
-  heroTitle: settings.home_hero_title || 'Our Latest Story',
-  heroBody: settings.home_hero_body || 'Discover timeless fashion pieces crafted in India for everyday elegance.',
-  heroPrimaryCta: settings.home_hero_primary_cta || 'Shop Edit',
-  heroSecondaryCta: settings.home_hero_secondary_cta || 'View Lookbook',
+  heroEyebrow: settings.home_hero_eyebrow || 'NEW EDITORIAL CAPSULE',
+  heroTitle: settings.home_hero_title || 'OUR LATEST STORY',
+  heroBody: settings.home_hero_body || 'Discover verified branded fashion, curated in India for everyday premium style.',
+  heroPrimaryCta: settings.home_hero_primary_cta || 'SHOP THE DROP',
+  heroSecondaryCta: settings.home_hero_secondary_cta || 'EXPLORE STYLE EDIT',
   heroImagePrimary: settings.home_hero_image_primary || 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85',
   heroImageSecondary: settings.home_hero_image_secondary || 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
   heroImageDetail: settings.home_hero_image_detail || 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=700&q=85',
@@ -98,15 +104,22 @@ const mapStorefrontContent = (settings: any): StorefrontContent => ({
   heroBadgeText: settings.home_hero_badge_text || 'Tailored quiet luxury',
   productsEyebrow: settings.home_products_eyebrow || 'Seasonal selection',
   productsTitle: settings.home_products_title || 'Our Products',
+  homeProductIds: listFromSetting(settings.home_products_ids, []),
   collectionEyebrow: settings.home_collection_eyebrow || 'Curated combinations',
   collectionTitle: settings.home_collection_title || 'Perfect Match',
   collectionBody: settings.home_collection_body || 'Explore curated collections designed to complement your style with comfort and confidence.',
   collectionImage: settings.home_collection_image || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=85',
+  collectionProductIds: listFromSetting(settings.home_collection_product_ids, []),
+  discoverEyebrow: settings.discover_eyebrow || 'OUR COMPLETE CODES',
+  discoverTitle: settings.discover_title || 'COLLECTIONS',
+  discoverSearchPlaceholder: settings.discover_search_placeholder || 'SEARCH PRODUCTS, STYLING OR RELEASES...',
+  discoverTagLabel: settings.discover_tag_label || 'STYLING DIARY:',
   jewelryEyebrow: settings.home_jewelry_eyebrow || 'Accessories edit',
   jewelryTitle: settings.home_jewelry_title || 'Story Jewelry',
   jewelryBody: settings.home_jewelry_body || 'Adorn yourself with timeless accessories that complete every look.',
   recommendationEyebrow: settings.home_recommendation_eyebrow || 'Selected next',
-  recommendationTitle: settings.home_recommendation_title || 'Recommendation'
+  recommendationTitle: settings.home_recommendation_title || 'Recommendation',
+  recommendationProductIds: listFromSetting(settings.home_recommendation_ids, ['linen-wide-pants', 'faux-leather-jacket', 'gray-tube-top', 'drawstring-linen-pants', 'convertible-crossbody-bag'])
 });
 
 const mapAddress = (address: any): Address => ({
@@ -181,6 +194,16 @@ export const storyApi = {
     return data.map(mapProduct);
   },
   settings: async () => mapStorefrontContent(await apiRequest('/settings')),
+  createContactRequest: (payload: {
+    name: string;
+    email: string;
+    phone?: string;
+    topic: string;
+    message: string;
+  }) => apiRequest('/contact', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
   googleConfig: async () => apiRequest<{ clientId: string }>('/auth/google/config'),
   login: async (email: string, password: string): Promise<AuthSession> => {
     const data = await apiRequest<{ user: any; token: string }>('/auth/login', {

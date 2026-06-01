@@ -1,139 +1,168 @@
 import React from 'react';
-import { ArrowRight, ShoppingBag } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Product, StorefrontContent } from '../types';
-import { CATEGORIES, PRODUCTS } from '../data';
-import { formatINR } from '../utils/currency';
+import { Product, StorefrontContent, StoryCategoryKey } from '../types';
+import { PRODUCTS } from '../data';
+import { STORY_CATEGORIES, StoryCategory, StoryGender, filterProductsForStoryCategory } from '../categoryConfig';
+import { HeroSection } from './HeroSection';
+import { CustomerNotesSection } from './CustomerNotesSection';
 
 interface ShopViewProps {
   onSelectProduct: (product: Product) => void;
   setActiveScreen: (screen: any) => void;
+  onOpenCategory: (category: StoryCategoryKey) => void;
   products?: Product[];
   content: StorefrontContent;
 }
 
-const HERO_IMAGES = [
-  {
-    src: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85',
-    alt: 'Model in a black tailored shirt from the STORY latest collection'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
-    alt: 'Model in soft grey knitwear styled for STORY'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=700&q=85',
-    alt: 'Minimal monochrome fashion detail'
-  }
-];
+const mainCategoryOrder: StoryCategoryKey[] = ['uppers', 'lowers', 'dresses', 'co-ords', 'footwear'];
+const secondaryCategoryOrder: StoryCategoryKey[] = ['accessories', 'inners'];
 
-const PRODUCT_GRID_IDS = [
-  'wide-legged-pants',
-  'relaxed-linen-shirt',
-  'crew-neck-sweater',
-  'classic-mini-dress',
-  'canvas-tote-bag',
-  'elongated-blazer',
-  'oversized-wool-coat',
-  'rib-knit-tank-top'
-];
-
-const RECOMMENDATION_IDS = [
-  'linen-wide-pants',
-  'faux-leather-jacket',
-  'gray-tube-top',
-  'drawstring-linen-pants',
-  'convertible-crossbody-bag'
-];
-
-const CATEGORY_GROUPS: Record<string, string[]> = {
-  'NEW ARRIVAL': ['wide-legged-pants', 'relaxed-linen-shirt', 'crew-neck-sweater'],
-  SALE: ['wide-legged-pants', 'classic-mini-dress', 'canvas-tote-bag'],
-  FEATURED: ['elongated-blazer', 'oversized-wool-coat', 'rib-knit-tank-top']
+const categoryImagePosition: Partial<Record<StoryCategoryKey, string>> = {
+  lowers: 'object-center',
+  footwear: 'object-center',
+  accessories: 'object-center',
+  inners: 'object-top'
 };
 
-const STATS = [
-  ['700+', 'Collections'],
-  ['8', 'Categories'],
-  ['5+', 'Collaborations'],
-  ['380', 'Brands']
-];
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false);
 
-function ProductCard({ product, onSelectProduct }: { product: Product; onSelectProduct: (product: Product) => void }) {
+  React.useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    updatePreference();
+    mediaQuery.addEventListener('change', updatePreference);
+    return () => mediaQuery.removeEventListener('change', updatePreference);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
+function CategoryImageRotator({ category }: { category: StoryCategory }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [isPaused, setIsPaused] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(false);
+  const imageEntries = React.useMemo(
+    () => (Object.entries(category.images) as [StoryGender | 'default', string][])
+      .filter((entry): entry is [StoryGender | 'default', string] => Boolean(entry[1])),
+    [category.images]
+  );
+
+  React.useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 639px)');
+    const updateMobile = () => setIsMobile(mediaQuery.matches);
+
+    updateMobile();
+    mediaQuery.addEventListener('change', updateMobile);
+    return () => mediaQuery.removeEventListener('change', updateMobile);
+  }, []);
+
+  React.useEffect(() => {
+    if (imageEntries.length < 2 || prefersReducedMotion || isPaused) return undefined;
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % imageEntries.length);
+    }, isMobile ? 5000 : 4000);
+
+    return () => window.clearInterval(timer);
+  }, [imageEntries.length, isMobile, isPaused, prefersReducedMotion]);
+
+  if (imageEntries.length === 0) return null;
+
+  return (
+    <span
+      className="absolute inset-0"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onPointerDown={() => setIsPaused(true)}
+      onPointerUp={() => setIsPaused(false)}
+    >
+      {imageEntries.map(([label, src], index) => (
+        <img
+          key={`${category.key}-${label}`}
+          src={src}
+          alt={`STORY ${category.label} ${label}`}
+          className={`absolute inset-0 h-full w-full object-cover grayscale contrast-[1.03] brightness-[1.08] transition duration-700 ${
+            index === activeIndex ? 'opacity-100' : 'opacity-0'
+          } ${categoryImagePosition[category.key] || 'object-top'}`}
+          loading={index === 0 ? 'eager' : 'lazy'}
+          referrerPolicy="no-referrer"
+        />
+      ))}
+    </span>
+  );
+}
+
+function CategoryCard({
+  category,
+  featured = false,
+  onOpenCategory,
+  className = ''
+}: {
+  key?: React.Key;
+  category: StoryCategory & { count: number };
+  featured?: boolean;
+  onOpenCategory: (category: StoryCategoryKey) => void;
+  className?: string;
+}) {
   return (
     <button
       type="button"
-      onClick={() => onSelectProduct(product)}
-      className="group min-w-0 text-left cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-[#111111]"
+      onClick={() => onOpenCategory(category.key)}
+      aria-label={`Open ${category.label} category`}
+      className={`group relative min-h-[260px] overflow-hidden bg-[#f1f0ec] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white ${
+        featured ? 'sm:min-h-[360px] lg:min-h-0' : 'sm:min-h-[260px] lg:min-h-0'
+      } ${className}`}
     >
-      <span className="block aspect-[3/4.15] overflow-hidden bg-[#efefed]">
-        <img
-          src={product.image}
-          alt={product.name}
-          className="h-full w-full object-cover grayscale transition duration-500 group-hover:scale-[1.035] group-hover:grayscale-0"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-        />
+      <span className="absolute inset-0 transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.03]">
+        <CategoryImageRotator category={category} />
       </span>
-      <span className="mt-4 block min-h-12 text-center">
-        <span className="block text-[12px] font-medium uppercase leading-tight text-[#111111]">
-          {product.name}
+      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(0,0,0,0.72)] from-0% to-transparent to-[60%] transition duration-500 group-hover:from-[rgba(0,0,0,0.82)]" />
+      <span className="pointer-events-none absolute bottom-0 left-0 right-0 p-5 text-white sm:p-6">
+        <span
+          className={`mb-[0.35rem] block font-medium uppercase leading-none tracking-[0.1em] text-white ${
+            featured ? 'text-xl' : 'text-sm'
+          }`}
+        >
+          {category.label}
         </span>
-        <span className="mt-1 block font-mono text-[11px] text-[#111111]">
-          {formatINR(product.price)}
+        <span className="block translate-y-1.5 font-mono text-[0.625rem] uppercase tracking-[0.15em] text-white/65 opacity-0 transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100">
+          Shop Category <ArrowRight size={12} strokeWidth={1.5} className="ml-1 inline-block align-[-2px]" />
         </span>
       </span>
     </button>
   );
 }
 
-const productMatchesKey = (product: Product, key: string) => product.id === key || product.slug === key;
-
-export const ShopView: React.FC<ShopViewProps> = ({ onSelectProduct, setActiveScreen, products, content }) => {
-  const [selectedCategory, setSelectedCategory] = React.useState('ALL');
+export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCategory, products, content }) => {
   const productSource = products && products.length > 0 ? products : PRODUCTS;
 
-  const productItems = React.useMemo(
-    () => {
-      const curated = PRODUCT_GRID_IDS
-        .map((id) => productSource.find((product) => productMatchesKey(product, id)))
-        .filter((product): product is Product => Boolean(product));
-
-      return curated.length >= 4 ? curated : productSource.slice(0, 8);
-    },
-    [productSource]
-  );
-
-  const filteredProducts = React.useMemo(() => {
-    if (selectedCategory === 'ALL') {
-      return productItems;
-    }
-
-    const groupedIds = CATEGORY_GROUPS[selectedCategory];
-    if (groupedIds) {
-      return productItems.filter((product) => groupedIds.some((id) => productMatchesKey(product, id)));
-    }
-
-    return productItems.filter((product) => product.category.toUpperCase() === selectedCategory);
-  }, [productItems, selectedCategory]);
-
-  const recommendationItems = React.useMemo(
-    () => {
-      const curated = RECOMMENDATION_IDS
-        .map((id) => productSource.find((product) => productMatchesKey(product, id)))
-        .filter((product): product is Product => Boolean(product));
-
-      return curated.length >= 3 ? curated : productSource.slice(0, 5);
-    },
-    [productSource]
-  );
-
-  const scrollToProducts = (category = 'ALL') => {
-    setSelectedCategory(category);
+  const scrollToProducts = () => {
     window.setTimeout(() => {
       document.getElementById('our-products-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 20);
   };
+
+  const categoryTiles = React.useMemo(() => STORY_CATEGORIES.map((category) => {
+    const categoryProducts = filterProductsForStoryCategory(productSource, category.key);
+    return {
+      ...category,
+      count: categoryProducts.length
+    };
+  }), [productSource]);
+  const categoryTileMap = React.useMemo(
+    () => new Map(categoryTiles.map((category) => [category.key, category])),
+    [categoryTiles]
+  );
+  const mainCategoryTiles = mainCategoryOrder
+    .map((key) => categoryTileMap.get(key))
+    .filter((category): category is StoryCategory & { count: number } => Boolean(category));
+  const secondaryCategoryTiles = secondaryCategoryOrder
+    .map((key) => categoryTileMap.get(key))
+    .filter((category): category is StoryCategory & { count: number } => Boolean(category));
 
   return (
     <motion.div
@@ -144,224 +173,77 @@ export const ShopView: React.FC<ShopViewProps> = ({ onSelectProduct, setActiveSc
       id="shop-view-container"
       className="bg-[#fafafa] pb-20 text-[#111111]"
     >
-      <section className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-4 pb-16 pt-10 sm:px-6 md:pt-16 lg:grid-cols-[0.92fr_1.08fr] lg:gap-14 lg:px-8" id="editorial-hero">
-        <div className="max-w-3xl space-y-7">
-          <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">{content.heroEyebrow}</p>
-          <h1 className="font-display text-6xl font-black uppercase leading-none text-[#050505] sm:text-7xl lg:text-8xl">
-            {content.heroTitle}
-          </h1>
-          <p className="max-w-sm text-sm leading-6 text-[#4c4c4c]">
-            {content.heroBody}
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => scrollToProducts()}
-              className="inline-flex items-center gap-2 bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase text-white transition hover:bg-black"
-            >
-              {content.heroPrimaryCta}
-              <ArrowRight size={14} strokeWidth={1.6} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveScreen('discover')}
-              className="inline-flex items-center gap-2 border border-[#111111] bg-transparent px-5 py-3 font-mono text-[10px] uppercase text-[#111111] transition hover:bg-white"
-            >
-              {content.heroSecondaryCta}
-              <ArrowRight size={14} strokeWidth={1.6} />
-            </button>
-          </div>
-        </div>
+      <HeroSection
+        content={content}
+        onShopEdit={scrollToProducts}
+        onViewLookbook={() => setActiveScreen('discover')}
+      />
 
-        <div className="relative min-h-[390px] sm:min-h-[520px] lg:min-h-[610px]" aria-label="STORY editorial image composition">
-          <div className="absolute left-0 top-8 h-[72%] w-[58%] overflow-hidden bg-[#e7e7e4] shadow-[0_18px_50px_rgba(0,0,0,0.08)]">
-            <img
-              src={content.heroImagePrimary || HERO_IMAGES[0].src}
-              alt={HERO_IMAGES[0].alt}
-              className="h-full w-full object-cover object-top grayscale"
-              loading="eager"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div className="absolute right-0 top-0 h-[64%] w-[54%] rotate-2 overflow-hidden bg-[#eeeeec] shadow-[0_18px_50px_rgba(0,0,0,0.09)]">
-            <img
-              src={content.heroImageSecondary || HERO_IMAGES[1].src}
-              alt={HERO_IMAGES[1].alt}
-              className="h-full w-full object-cover object-top grayscale"
-              loading="eager"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div className="absolute bottom-0 right-[12%] h-[34%] w-[42%] -rotate-3 overflow-hidden bg-[#f4f4f2] shadow-[0_18px_50px_rgba(0,0,0,0.08)]">
-            <img
-              src={content.heroImageDetail || HERO_IMAGES[2].src}
-              alt={HERO_IMAGES[2].alt}
-              className="h-full w-full object-cover object-center grayscale"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div className="absolute bottom-8 left-3 bg-white px-5 py-4 shadow-[0_10px_36px_rgba(0,0,0,0.08)] sm:left-8">
-            <p className="font-mono text-[9px] uppercase text-[#6f6f6f]">{content.heroBadgeEyebrow}</p>
-            <p className="mt-1 text-xs uppercase text-[#111111]">{content.heroBadgeText}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" id="our-products-section">
-        <div className="mb-9 text-center">
-          <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">{content.productsEyebrow}</p>
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-20" id="our-products-section">
+        <div className="mx-auto mb-10 max-w-2xl text-center">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#6f6f6f]">{content.productsEyebrow}</p>
           <h2 className="mt-2 font-display text-4xl font-black uppercase leading-none sm:text-5xl">
             {content.productsTitle}
           </h2>
+          <p className="mx-auto mt-4 max-w-[400px] text-[0.875rem] leading-6 text-[#555555]">
+            Explore curated essentials across clothing, footwear, and everyday luxury.
+          </p>
+          <div className="mx-auto mt-7 h-px w-10 bg-[#111111]" aria-hidden="true" />
         </div>
 
-        <div className="mx-auto mb-12 flex max-w-5xl flex-wrap justify-center gap-2">
-          {CATEGORIES.map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() => setSelectedCategory(category)}
-              className={`border px-4 py-2 font-mono text-[9px] uppercase transition ${
-                selectedCategory === category
-                  ? 'border-[#111111] bg-[#111111] text-white'
-                  : 'border-[#cfcfcb] bg-white text-[#555555] hover:border-[#111111] hover:text-[#111111]'
-              }`}
-            >
-              {category}
-            </button>
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-[3px] bg-white sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr] lg:grid-rows-[260px_260px]">
+          {mainCategoryTiles.map((category, index) => (
+            <CategoryCard
+              key={category.key}
+              category={category}
+              featured={index === 0}
+              onOpenCategory={onOpenCategory}
+              className={index === 0 ? 'lg:col-start-1 lg:row-span-2 lg:row-start-1' : ''}
+            />
           ))}
         </div>
 
-        {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-4 lg:gap-x-6">
-            {filteredProducts.map((product) => (
-              <React.Fragment key={product.id}>
-                <ProductCard product={product} onSelectProduct={onSelectProduct} />
-              </React.Fragment>
+        {secondaryCategoryTiles.length > 0 && (
+          <div className="mx-auto mt-[3px] grid max-w-6xl grid-cols-1 gap-[3px] bg-white sm:grid-cols-2 lg:grid-cols-3">
+            {secondaryCategoryTiles.map((category) => (
+              <CategoryCard
+                key={category.key}
+                category={category}
+                onOpenCategory={onOpenCategory}
+                className="min-h-[220px] sm:min-h-[220px] lg:min-h-[200px]"
+              />
             ))}
-          </div>
-        ) : (
-          <div className="mx-auto max-w-md border border-dashed border-[#bdbdb9] bg-white px-6 py-12 text-center">
-            <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">
-              This category is being prepared for the next STORY release.
-            </p>
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('ALL')}
-              className="mt-5 bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase text-white"
-            >
-              View All
-            </button>
           </div>
         )}
+
+        <div className="mx-auto mt-10 flex max-w-6xl flex-col items-center justify-center gap-3 border-t border-black/10 pt-6 text-center font-mono text-[0.625rem] uppercase tracking-[0.18em] text-[#6f6f6f] sm:flex-row sm:gap-8">
+          <span>Verified authentic pieces</span>
+          <span>100% original</span>
+          <span>Best price & quality</span>
+        </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8" id="perfect-match-section">
-        <div className="aspect-[5/4] overflow-hidden bg-[#e9e9e6]">
-          <img
-            src={content.collectionImage || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=85'}
-            alt="STORY styled knitwear campaign"
-            className="h-full w-full object-cover object-top grayscale"
-            loading="lazy"
-            referrerPolicy="no-referrer"
-          />
-        </div>
+      <CustomerNotesSection />
 
-        <div className="space-y-8 lg:pl-8">
-          <div>
-            <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">{content.collectionEyebrow}</p>
-            <h2 className="mt-3 font-display text-5xl font-black uppercase leading-none sm:text-6xl lg:text-7xl">
-              {content.collectionTitle}
+      <section className="border-y border-[#d8d8d3] bg-white" aria-label="Our story">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-7 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_auto] lg:px-8 lg:py-14">
+          <div className="max-w-3xl">
+            <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#6f6f6f]">Our Story</p>
+            <h2 className="mt-4 font-display text-3xl font-black uppercase leading-tight text-[#050505] sm:text-4xl lg:text-5xl">
+              Designed in studio. Made to outlast trend.
             </h2>
-            <p className="mt-5 max-w-lg text-sm leading-6 text-[#4c4c4c]">
-              {content.collectionBody}
+            <p className="mt-4 max-w-xl text-sm leading-6 text-[#555555]">
+              Constructed by hand with quiet detail and everyday endurance.
             </p>
           </div>
-
-          <div className="grid grid-cols-2 gap-6 border-t border-[#d8d8d3] pt-8 sm:grid-cols-4">
-            {STATS.map(([value, label]) => (
-              <div key={label}>
-                <p className="font-display text-3xl font-black text-[#111111]">{value}</p>
-                <p className="mt-1 font-mono text-[9px] uppercase text-[#6f6f6f]">{label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8" id="story-jewelry">
-        <div className="mb-9 text-center">
-          <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">{content.jewelryEyebrow}</p>
-          <h2 className="mt-2 font-display text-4xl font-black uppercase leading-none sm:text-5xl">
-            {content.jewelryTitle}
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="grid min-h-[520px] grid-cols-5 grid-rows-6 gap-5">
-            <div className="col-span-5 row-span-4 overflow-hidden bg-[#eeeeec] sm:col-span-3 sm:row-span-6">
-              <img
-                src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=900&q=85"
-                alt="Model wearing minimal STORY earrings"
-                className="h-full w-full object-cover object-center grayscale"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-            <div className="col-span-5 row-span-2 overflow-hidden bg-[#111111] sm:col-span-2 sm:row-span-3">
-              <img
-                src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=900&q=85"
-                alt="Close up of minimal rings and accessories"
-                className="h-full w-full object-cover object-center grayscale"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-            <div className="col-span-5 row-span-2 hidden overflow-hidden bg-[#eeeeec] sm:col-span-2 sm:row-span-3 sm:block">
-              <img
-                src="https://images.unsplash.com/photo-1611652022419-a9419f74343d?auto=format&fit=crop&w=900&q=85"
-                alt="Minimal necklace detail from STORY jewelry"
-                className="h-full w-full object-cover object-center grayscale"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-end bg-white p-7 shadow-[0_14px_42px_rgba(0,0,0,0.06)] sm:p-10">
-            <div className="space-y-6">
-              <ShoppingBag size={22} strokeWidth={1.4} />
-              <p className="max-w-sm text-2xl font-medium leading-tight text-[#111111]">
-                {content.jewelryBody}
-              </p>
-              <button
-                type="button"
-                onClick={() => scrollToProducts('ACCESSORY')}
-                className="inline-flex items-center gap-2 bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase text-white transition hover:bg-black"
-              >
-                Shop Now
-                <ArrowRight size={14} strokeWidth={1.6} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8" id="shop-recommendations">
-        <div className="mb-9 text-center">
-          <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">{content.recommendationEyebrow}</p>
-          <h2 className="mt-2 font-display text-4xl font-black uppercase leading-none sm:text-5xl">
-            {content.recommendationTitle}
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-6">
-          {recommendationItems.map((product) => (
-            <React.Fragment key={product.id}>
-              <ProductCard product={product} onSelectProduct={onSelectProduct} />
-            </React.Fragment>
-          ))}
+          <button
+            type="button"
+            onClick={() => setActiveScreen('about')}
+            className="group inline-flex w-fit items-center gap-3 border border-[#111111] px-5 py-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[#111111] transition hover:bg-[#111111] hover:text-white"
+          >
+            Read the Story
+            <ArrowRight size={15} strokeWidth={1.6} className="transition-transform duration-300 group-hover:translate-x-1" />
+          </button>
         </div>
       </section>
     </motion.div>

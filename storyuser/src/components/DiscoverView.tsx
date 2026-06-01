@@ -1,113 +1,261 @@
 import React from 'react';
-import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Product } from '../types';
-import { PRODUCTS, TRENDING_TAGS } from '../data';
+import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Product, StorefrontContent, StoryCategoryKey } from '../types';
+import { PRODUCTS } from '../data';
+import {
+  STORY_CATEGORIES,
+  StoryCategory,
+  StoryGender,
+  filterProductsForStoryCategory,
+  getCategoryImage,
+  getStoryCategory
+} from '../categoryConfig';
 import { formatINR } from '../utils/currency';
 
 interface DiscoverViewProps {
   onSelectProduct: (product: Product) => void;
   products?: Product[];
+  content: StorefrontContent;
 }
 
-const ALL_CATEGORIES = ["ALL", "OUTERWEAR", "BOTTOM", "DRESSES", "ACCESSORY", "TOP", "KNITWEAR", "SHIRTS"];
-const ALL_SIZES = ["ALL", "XS", "S", "M", "L", "XL"];
-const ALL_COLORS = ["ALL", "Black", "White", "Grey", "Beige", "Slate", "Ecru"];
+type SortOption = 'newest' | 'price-low' | 'price-high' | 'popular' | 'best-match';
+type FilterMenu = 'category' | 'gender' | 'size' | 'brand' | 'sort' | null;
+type GenderFilter = 'all' | StoryGender;
 
-export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, products }) => {
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedTag, setSelectedTag] = React.useState<string | null>(null);
-  const [sortBy, setSortBy] = React.useState<'default' | 'price-low' | 'price-high'>('default');
-  
-  // Luxury Filter states with simple elegant click dropdown toggles
-  const [selectedCategory, setSelectedCategory] = React.useState('ALL');
-  const [selectedSize, setSelectedSize] = React.useState('ALL');
-  const [selectedColor, setSelectedColor] = React.useState('ALL');
+const CATEGORY_OPTIONS = ['all', ...STORY_CATEGORIES.map((category) => category.key)] as Array<'all' | StoryCategoryKey>;
+const BRAND_OPTIONS = [
+  'All',
+  'Versace',
+  'Karl Lagerfeld',
+  'Lacoste',
+  'Superdry',
+  'Tommy Hilfiger',
+  'Burberry',
+  'True Religion',
+  'Rare Rabbit',
+  'Blackberrys',
+  'Zara',
+  'Calvin Klein',
+  'Michael Kors',
+  'Hugo Boss',
+  'Ralph Lauren'
+];
 
-  const [activeDropdown, setActiveDropdown] = React.useState<'category' | 'size' | 'color' | 'sort' | null>(null);
-  const productSource = products && products.length > 0 ? products : PRODUCTS;
+const FALLBACK_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '26', '28', '30', '32', '34', '36', '38', '40', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+
+const SORT_LABELS: Record<SortOption, string> = {
+  newest: 'Newest',
+  'price-low': 'Price Low to High',
+  'price-high': 'Price High to Low',
+  popular: 'Most Popular',
+  'best-match': 'Best Match'
+};
+
+const getAvailableGenders = (category: StoryCategory | null): GenderFilter[] => {
+  if (!category?.genders) return ['all'];
+  return Object.keys(category.genders) as StoryGender[];
+};
+
+const getAvailableSizes = (category: StoryCategory | null, gender: GenderFilter) => {
+  if (!category?.genders) return FALLBACK_SIZES;
+  if (gender !== 'all') return category.genders[gender] || [];
+
+  return Array.from(new Set(Object.values(category.genders).flat()));
+};
+
+const categoryLabel = (key: 'all' | StoryCategoryKey) => key === 'all' ? 'All' : getStoryCategory(key).label;
+
+const productMatchesKey = (product: Product, key: string) => product.id === key || product.slug === key;
+
+const productBrandText = (product: Product) => `${product.name} ${product.description || ''} ${product.composition || ''}`.toLowerCase();
+
+function SelectDropdown({
+  label,
+  value,
+  options,
+  active,
+  onToggle,
+  onSelect
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  active: boolean;
+  onToggle: () => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.18em] transition hover:text-[#111111] ${value !== 'All' && value !== 'Newest' ? 'text-[#111111]' : 'text-[#6f6f6f]'}`}
+        aria-label={`${label} filter`}
+      >
+        {label}: <span className="font-semibold text-[#111111]">{value}</span>
+        <ChevronDown size={12} strokeWidth={1.6} className={`transition ${active ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {active && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            className="absolute left-0 top-7 z-40 max-h-72 w-56 overflow-auto border border-[#111111] bg-white shadow-sm"
+          >
+            {options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onSelect(option)}
+                className={`block w-full px-4 py-2.5 text-left font-mono text-[10px] uppercase tracking-[0.16em] transition hover:bg-[#f4f4f1] ${value === option ? 'bg-[#111111] text-white' : 'text-[#555555]'}`}
+              >
+                {option}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, products, content }) => {
+  const rawProductSource = products && products.length > 0 ? products : PRODUCTS;
+  const productSource = React.useMemo(() => {
+    if (content.collectionProductIds.length === 0) return rawProductSource;
+    const selected = content.collectionProductIds
+      .map((id) => rawProductSource.find((product) => productMatchesKey(product, id)))
+      .filter((product): product is Product => Boolean(product));
+    return selected.length > 0 ? selected : rawProductSource;
+  }, [rawProductSource, content.collectionProductIds]);
+
+  const params = React.useMemo(() => new URLSearchParams(window.location.search), []);
+  const initialCategory = params.get('category') as StoryCategoryKey | null;
+  const [searchQuery, setSearchQuery] = React.useState(params.get('q') || '');
+  const [selectedCategory, setSelectedCategory] = React.useState<'all' | StoryCategoryKey>(
+    initialCategory && STORY_CATEGORIES.some((category) => category.key === initialCategory) ? initialCategory : 'all'
+  );
+  const [selectedGender, setSelectedGender] = React.useState<GenderFilter>((params.get('gender') as GenderFilter) || 'all');
+  const [selectedSize, setSelectedSize] = React.useState(params.get('size') || 'All');
+  const [selectedBrand, setSelectedBrand] = React.useState(params.get('brand') || 'All');
+  const [sortBy, setSortBy] = React.useState<SortOption>((params.get('sort') as SortOption) || 'newest');
+  const [activeDropdown, setActiveDropdown] = React.useState<FilterMenu>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
+
+  const activeCategory = selectedCategory === 'all' ? null : getStoryCategory(selectedCategory);
+  const genderOptions = getAvailableGenders(activeCategory);
+  const sizeOptions = getAvailableSizes(activeCategory, selectedGender);
+
+  React.useEffect(() => {
+    if (selectedCategory === 'all') return;
+    const category = getStoryCategory(selectedCategory);
+    const availableGenders = getAvailableGenders(category);
+
+    if (!availableGenders.includes(selectedGender)) {
+      setSelectedGender(availableGenders[0] || 'all');
+      setSelectedSize('All');
+    }
+  }, [selectedCategory, selectedGender]);
+
+  React.useEffect(() => {
+    const nextParams = new URLSearchParams();
+    if (searchQuery) nextParams.set('q', searchQuery);
+    if (selectedCategory !== 'all') nextParams.set('category', selectedCategory);
+    if (selectedGender !== 'all') nextParams.set('gender', selectedGender);
+    if (selectedSize !== 'All') nextParams.set('size', selectedSize);
+    if (selectedBrand !== 'All') nextParams.set('brand', selectedBrand);
+    if (sortBy !== 'newest') nextParams.set('sort', sortBy);
+
+    const nextQuery = nextParams.toString();
+    const nextUrl = nextQuery ? `/collections?${nextQuery}` : '/collections';
+    if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+      window.history.replaceState({}, '', nextUrl);
+    }
+  }, [searchQuery, selectedBrand, selectedCategory, selectedGender, selectedSize, sortBy]);
+
+  const setCategoryFilter = (category: 'all' | StoryCategoryKey) => {
+    setSelectedCategory(category);
+    setSelectedSize('All');
+    setActiveDropdown(null);
+
+    if (category === 'all') {
+      setSelectedGender('all');
+      return;
+    }
+
+    const availableGenders = getAvailableGenders(getStoryCategory(category));
+    setSelectedGender(availableGenders.includes('women') ? 'women' : availableGenders[0] || 'all');
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory('all');
+    setSelectedGender('all');
+    setSelectedSize('All');
+    setSelectedBrand('All');
+    setSortBy('newest');
+    setActiveDropdown(null);
+    setMobileFiltersOpen(false);
+  };
 
   const filteredProducts = React.useMemo(() => {
     let result = [...productSource];
 
-    // Filter by query
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        p.category.toLowerCase().includes(q) ||
-        (p.description && p.description.toLowerCase().includes(q))
-      );
+    if (selectedCategory !== 'all') {
+      const categoryProductIds = new Set(filterProductsForStoryCategory(result, selectedCategory).map((product) => product.id));
+      result = result.filter((product) => categoryProductIds.has(product.id));
     }
 
-    // Filter by Category dropdown
-    if (selectedCategory !== 'ALL') {
-      result = result.filter(p => p.category.toUpperCase() === selectedCategory.toUpperCase());
+    if (selectedSize !== 'All') {
+      result = result.filter((product) => product.sizes?.includes(selectedSize));
     }
 
-    // Filter by Size dropdown
-    if (selectedSize !== 'ALL') {
-      result = result.filter(p => p.sizes && p.sizes.includes(selectedSize));
+    if (selectedBrand !== 'All') {
+      const brand = selectedBrand.toLowerCase();
+      result = result.filter((product) => productBrandText(product).includes(brand));
     }
 
-    // Filter by Color dropdown
-    if (selectedColor !== 'ALL') {
-      result = result.filter(p => 
-        p.colors && p.colors.some(c => c.name.toLowerCase().includes(selectedColor.toLowerCase()))
-      );
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((product) => (
+        product.name.toLowerCase().includes(query) ||
+        product.category.toLowerCase().includes(query) ||
+        product.sizes?.some((size) => size.toLowerCase().includes(query)) ||
+        productBrandText(product).includes(query)
+      ));
     }
 
-    // Filter by trending tags
-    if (selectedTag) {
-      const tag = selectedTag.toLowerCase();
-      if (tag === 'wool blazers') {
-        result = result.filter(p => p.name.toLowerCase().includes('blazer'));
-      } else if (tag === 'monochrome') {
-        result = result.filter(p => !p.name.toLowerCase().includes('stripe') && !p.name.toLowerCase().includes('blue'));
-      } else if (tag === 'minimalist utility') {
-        result = result.filter(p => p.category === 'BOTTOM' || p.category === 'OUTERWEAR');
-      } else if (tag === 'architectural drape') {
-        result = result.filter(p => p.name.toLowerCase().includes('coat') || p.name.toLowerCase().includes('blazer') || p.name.toLowerCase().includes('pants') || p.name.toLowerCase().includes('trousers') || p.name.toLowerCase().includes('dress'));
-      } else if (tag === 'raw seams') {
-        result = result.filter(p => p.name.toLowerCase().includes('knit') || p.name.toLowerCase().includes('sweater'));
-      } else if (tag === 'sustainable chic') {
-        result = result.filter(p => p.composition && p.composition.toLowerCase().includes('organic'));
-      }
-    }
-
-    // Sorting
-    if (sortBy === 'price-low') {
-      result.sort((a, b) => a.price - b.price);
-    } else if (sortBy === 'price-high') {
-      result.sort((a, b) => b.price - a.price);
-    }
+    if (sortBy === 'price-low') result.sort((a, b) => a.price - b.price);
+    if (sortBy === 'price-high') result.sort((a, b) => b.price - a.price);
 
     return result;
-  }, [productSource, searchQuery, selectedCategory, selectedSize, selectedColor, selectedTag, sortBy]);
+  }, [productSource, searchQuery, selectedBrand, selectedCategory, selectedSize, sortBy]);
 
-  const handleTagClick = (tag: string) => {
-    if (selectedTag === tag) {
-      setSelectedTag(null); // toggle off
-    } else {
-      setSelectedTag(tag);
-      setSearchQuery(''); // clear query when selecting tag
-      setSelectedCategory('ALL');
-      setSelectedSize('ALL');
-      setSelectedColor('ALL');
-    }
+  const categoryDropdownOptions = CATEGORY_OPTIONS.map(categoryLabel);
+  const categoryValue = categoryLabel(selectedCategory);
+  const genderDropdownOptions = genderOptions.map((gender) => gender === 'all' ? 'All' : gender[0].toUpperCase() + gender.slice(1));
+  const genderValue = selectedGender === 'all' ? 'All' : selectedGender[0].toUpperCase() + selectedGender.slice(1);
+  const sizeDropdownOptions = ['All', ...sizeOptions];
+  const sortOptions = Object.values(SORT_LABELS);
+  const sortValue = SORT_LABELS[sortBy];
+
+  const selectCategoryByLabel = (label: string) => {
+    const category = CATEGORY_OPTIONS.find((option) => categoryLabel(option) === label) || 'all';
+    setCategoryFilter(category);
   };
 
-  const clearSearch = () => {
-    setSearchQuery('');
-    setSelectedTag(null);
-    setSelectedCategory('ALL');
-    setSelectedSize('ALL');
-    setSelectedColor('ALL');
-    setSortBy('default');
+  const selectGenderByLabel = (label: string) => {
+    setSelectedGender(label === 'All' ? 'all' : label.toLowerCase() as StoryGender);
+    setSelectedSize('All');
+    setActiveDropdown(null);
   };
 
-  const toggleDropdown = (menu: 'category' | 'size' | 'color' | 'sort') => {
-    setActiveDropdown(activeDropdown === menu ? null : menu);
+  const selectSortByLabel = (label: string) => {
+    const nextSort = (Object.entries(SORT_LABELS).find(([, value]) => value === label)?.[0] || 'newest') as SortOption;
+    setSortBy(nextSort);
+    setActiveDropdown(null);
   };
 
   return (
@@ -117,294 +265,220 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
       id="discover-view-container"
-      className="max-w-7xl mx-auto px-4 md:px-8 py-12 md:py-16 space-y-12"
+      className="mx-auto max-w-7xl space-y-10 px-4 py-10 sm:px-6 lg:px-8 lg:py-14"
     >
-      
-      {/* Massive Editorial Header centered to match exact STORY looks */}
-      <header className="text-center mb-10" id="categories-header-title">
-        <span className="font-mono text-[10px] tracking-[0.25em] text-[#767676] uppercase block mb-3 font-semibold">
-          OUR COMPLETE CODES
+      <header className="mx-auto max-w-4xl text-center" id="categories-header-title">
+        <span className="mb-3 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-[#767676]">
+          CURATED DROPS
         </span>
-        <h1 className="font-display font-light text-5xl sm:text-7xl lg:text-8xl tracking-[0.05em] text-[#121212] uppercase select-none leading-none">
-          COLLECTIONS
+        <h1 className="font-display text-[clamp(2.7rem,10vw,5.75rem)] font-black uppercase leading-none text-[#121212]">
+          Shop the Story Edit
         </h1>
+        <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[#555555]">
+          Verified branded fashion, curated in India across clothing, footwear, and everyday essentials.
+        </p>
       </header>
 
-      {/* Styled Minimalist Search Bar */}
-      <div className="space-y-4 max-w-3xl mx-auto" id="search-bar-block">
-        <div className="relative border border-[#111111] bg-white flex items-center">
-          <div className="pl-4 text-[#111111]">
-            <Search size={18} strokeWidth={1.5} />
-          </div>
-
+      <div className="mx-auto max-w-3xl space-y-5" id="search-bar-block">
+        <div className="relative flex items-center border border-[#111111] bg-white">
+          <Search size={18} strokeWidth={1.5} className="ml-4 text-[#111111]" />
           <input
             type="text"
-            placeholder="SEARCH PRODUCTS, STYLING OR RELEASES..."
+            placeholder="SEARCH UPPERS, FOOTWEAR, BRANDS OR SIZES..."
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setSelectedTag(null); // clear tag when typing
-            }}
-            className="w-full bg-transparent px-4 py-3.5 text-[11px] font-mono tracking-widest focus:outline-none placeholder-gray-400 text-[#111111] border-0"
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="w-full border-0 bg-transparent px-4 py-3.5 font-mono text-[11px] tracking-widest text-[#111111] placeholder:text-[#9a9a94] focus:outline-none"
             id="discover-search-input"
           />
-
-          {(searchQuery || selectedTag || selectedCategory !== 'ALL' || selectedSize !== 'ALL' || selectedColor !== 'ALL') && (
+          {searchQuery && (
             <button
-              onClick={clearSearch}
-              className="pr-4 text-[#767676] hover:text-[#121212] py-2 cursor-pointer transition-colors"
-              id="clear-search-btn"
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
+              className="px-4 py-2 text-[#767676] transition hover:text-[#121212]"
             >
               <X size={16} strokeWidth={1.5} />
             </button>
           )}
         </div>
 
-        {/* Trending filter tags row */}
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-          <span className="font-mono text-[8px] tracking-widest text-[#767676] font-semibold uppercase mr-2">
-            STYLING DIARY:
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span className="mr-2 font-mono text-[8px] font-semibold uppercase tracking-widest text-[#767676]">
+            SHOP BY CATEGORY:
           </span>
-          {TRENDING_TAGS.map((tag) => (
+          {CATEGORY_OPTIONS.map((category) => (
             <button
-              key={tag}
-              onClick={() => handleTagClick(tag)}
-              className={`px-3 py-1.5 font-mono text-[8px] tracking-widest border transition-all cursor-pointer ${
-                selectedTag === tag
-                  ? 'bg-[#121212] text-white border-[#121212]'
-                  : 'bg-[#FAFAFA] text-[#767676] border-[#E5E5E5] hover:text-[#121212] hover:border-[#121212]'
+              key={category}
+              type="button"
+              onClick={() => setCategoryFilter(category)}
+              className={`border px-3 py-1.5 font-mono text-[8px] uppercase tracking-widest transition ${
+                selectedCategory === category
+                  ? 'border-[#121212] bg-[#121212] text-white'
+                  : 'border-[#e0e0dc] bg-white text-[#555555] hover:border-[#121212] hover:text-[#121212]'
               }`}
-              id={`trending-tag-${tag.toLowerCase().replace(/\s+/g, '-')}`}
             >
-              {tag}
+              {categoryLabel(category)}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Luxury Sort/Filter Bar layout matching STORY reference with border-y styling */}
-      <div 
-        className="border-y border-[#121212] py-4 flex flex-col sm:flex-row justify-between items-center px-4 font-mono text-[10px] tracking-widest select-none bg-[#FAFAFA]" 
-        id="categories-interactive-sort"
-      >
-        {/* Left Side: interactive cascading dropdown select trigger blocks */}
-        <div className="flex flex-wrap items-center gap-6 sm:gap-10 text-[#767676] mb-4 sm:mb-0">
-          
-          {/* CATEGORY DROPDOWN */}
-          <div className="relative">
-            <button 
-              onClick={() => toggleDropdown('category')}
-              className={`flex items-center space-x-1 hover:text-[#121212] transition-colors cursor-pointer uppercase font-medium ${selectedCategory !== 'ALL' ? 'text-[#121212] font-semibold' : ''}`}
+      <section aria-label="Category strip" className="overflow-hidden">
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {STORY_CATEGORIES.map((category) => (
+            <button
+              key={category.key}
+              type="button"
+              onClick={() => setCategoryFilter(category.key)}
+              className={`group relative h-36 w-36 shrink-0 overflow-hidden border text-left transition sm:h-40 sm:w-44 ${
+                selectedCategory === category.key ? 'border-[#111111]' : 'border-[#d8d8d3]'
+              }`}
             >
-              <span>Category: <span className="text-[#121212] font-bold">{selectedCategory}</span></span>
-              <ChevronDown size={11} className={`transform transition-transform ${activeDropdown === 'category' ? 'rotate-180' : ''}`} />
+              <img
+                src={getCategoryImage(category, selectedGender)}
+                alt={category.label}
+                className="absolute inset-0 h-full w-full object-cover object-top grayscale brightness-105 transition duration-500 group-hover:scale-[1.03]"
+                loading="lazy"
+              />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
+              <span className="absolute bottom-3 left-3 right-3 text-white">
+                <span className="block font-display text-xl font-black uppercase leading-none">{category.label}</span>
+                <span className="mt-2 inline-flex items-center gap-1 font-mono text-[8px] uppercase tracking-[0.18em]">
+                  Shop <ChevronDown size={10} className="-rotate-90" />
+                </span>
+              </span>
             </button>
-            <AnimatePresence>
-              {activeDropdown === 'category' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 5 }}
-                  className="absolute left-0 mt-2.5 w-44 bg-white border border-[#121212] z-40 shadow-sm divide-y divide-[#E5E5E5]"
-                >
-                  {ALL_CATEGORIES.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => { setSelectedCategory(cat); setActiveDropdown(null); }}
-                      className={`block w-full text-left px-4 py-2 hover:bg-[#FAFAFA] text-[10px] tracking-widest font-mono uppercase transition-colors ${selectedCategory === cat ? 'bg-neutral-100 font-bold text-[#121212]' : 'text-[#767676]'}`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* SIZE DROPDOWN */}
-          <div className="relative">
-            <button 
-              onClick={() => toggleDropdown('size')}
-              className={`flex items-center space-x-1 hover:text-[#121212] transition-colors cursor-pointer uppercase font-medium ${selectedSize !== 'ALL' ? 'text-[#121212] font-semibold' : ''}`}
-            >
-              <span>Size: <span className="text-[#121212] font-bold">{selectedSize}</span></span>
-              <ChevronDown size={11} className={`transform transition-transform ${activeDropdown === 'size' ? 'rotate-180' : ''}`} />
-            </button>
-            <AnimatePresence>
-              {activeDropdown === 'size' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 5 }}
-                  className="absolute left-0 mt-2.5 w-32 bg-white border border-[#121212] z-40 shadow-sm divide-y divide-[#E5E5E5]"
-                >
-                  {ALL_SIZES.map((sz) => (
-                    <button
-                      key={sz}
-                      onClick={() => { setSelectedSize(sz); setActiveDropdown(null); }}
-                      className={`block w-full text-left px-4 py-2 hover:bg-[#FAFAFA] text-[10px] tracking-widest font-mono uppercase transition-colors ${selectedSize === sz ? 'bg-neutral-100 font-bold text-[#121212]' : 'text-[#767676]'}`}
-                    >
-                      {sz}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* COLOR DROPDOWN */}
-          <div className="relative">
-            <button 
-              onClick={() => toggleDropdown('color')}
-              className={`flex items-center space-x-1 hover:text-[#121212] transition-colors cursor-pointer uppercase font-medium ${selectedColor !== 'ALL' ? 'text-[#121212] font-bold text-black border-b border-[#121212]' : ''}`}
-            >
-              <span>Color: <span className="text-[#121212] font-bold">{selectedColor}</span></span>
-              <ChevronDown size={11} className={`transform transition-transform ${activeDropdown === 'color' ? 'rotate-180' : ''}`} />
-            </button>
-            <AnimatePresence>
-              {activeDropdown === 'color' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 5 }}
-                  className="absolute left-0 mt-2.5 w-40 bg-white border border-[#121212] z-40 shadow-sm divide-y divide-[#E5E5E5]"
-                >
-                  {ALL_COLORS.map((clr) => (
-                    <button
-                      key={clr}
-                      onClick={() => { setSelectedColor(clr); setActiveDropdown(null); }}
-                      className={`block w-full text-left px-4 py-2 hover:bg-[#FAFAFA] text-[10px] tracking-widest font-mono uppercase transition-colors ${selectedColor === clr ? 'bg-neutral-100 font-bold text-[#121212]' : 'text-[#767676]'}`}
-                    >
-                      {clr}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
+          ))}
         </div>
+      </section>
 
-        {/* Right Side: SORT BY dropdown button */}
-        <div className="relative text-[#767676]">
-          <button 
-            onClick={() => toggleDropdown('sort')}
-            className="flex items-center space-x-1 hover:text-[#121212] transition-colors cursor-pointer uppercase font-medium"
-          >
-            <span>Sort By: <span className="text-[#121212] font-bold">{sortBy === 'price-low' ? 'PRICE LOW-HIGH' : sortBy === 'price-high' ? 'PRICE HIGH-LOW' : 'DEFAULT INDEX'}</span></span>
-            <ChevronDown size={11} className={`transform transition-transform ${activeDropdown === 'sort' ? 'rotate-180' : ''}`} />
-          </button>
-          <AnimatePresence>
-            {activeDropdown === 'sort' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 5 }}
-                className="absolute right-0 mt-2.5 w-48 bg-white border border-[#121212] z-40 shadow-sm divide-y divide-[#E5E5E5]"
-              >
-                <button
-                  onClick={() => { setSortBy('default'); setActiveDropdown(null); }}
-                  className="block w-full text-left px-4 py-2 hover:bg-[#FAFAFA] text-[10px] tracking-widest font-mono uppercase text-[#767676]"
-                >
-                  DEFAULT INDEX
-                </button>
-                <button
-                  onClick={() => { setSortBy('price-low'); setActiveDropdown(null); }}
-                  className="block w-full text-left px-4 py-2 hover:bg-[#FAFAFA] text-[10px] tracking-widest font-mono uppercase text-[#767676]"
-                >
-                  PRICE: LOW TO HIGH
-                </button>
-                <button
-                  onClick={() => { setSortBy('price-high'); setActiveDropdown(null); }}
-                  className="block w-full text-left px-4 py-2 hover:bg-[#FAFAFA] text-[10px] tracking-widest font-mono uppercase text-[#767676]"
-                >
-                  PRICE: HIGH TO LOW
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+      <div className="hidden items-center justify-between border-y border-[#121212] bg-[#fafafa] px-4 py-4 lg:flex">
+        <div className="flex flex-wrap items-center gap-8">
+          <SelectDropdown label="Category" value={categoryValue} options={categoryDropdownOptions} active={activeDropdown === 'category'} onToggle={() => setActiveDropdown(activeDropdown === 'category' ? null : 'category')} onSelect={selectCategoryByLabel} />
+          <SelectDropdown label="Gender" value={genderValue} options={genderDropdownOptions} active={activeDropdown === 'gender'} onToggle={() => setActiveDropdown(activeDropdown === 'gender' ? null : 'gender')} onSelect={selectGenderByLabel} />
+          <SelectDropdown label="Size" value={selectedSize} options={sizeDropdownOptions} active={activeDropdown === 'size'} onToggle={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')} onSelect={(value) => { setSelectedSize(value); setActiveDropdown(null); }} />
+          <SelectDropdown label="Brand" value={selectedBrand} options={BRAND_OPTIONS} active={activeDropdown === 'brand'} onToggle={() => setActiveDropdown(activeDropdown === 'brand' ? null : 'brand')} onSelect={(value) => { setSelectedBrand(value); setActiveDropdown(null); }} />
         </div>
-
+        <SelectDropdown label="Sort By" value={sortValue} options={sortOptions} active={activeDropdown === 'sort'} onToggle={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')} onSelect={selectSortByLabel} />
       </div>
 
-      {/* Grid metrics summary */}
-      <div className="flex justify-between items-center text-[#767676] font-mono text-[9px] -mt-6">
-        <div className="flex items-center space-x-1.5">
+      <div className="lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen(true)}
+          className="flex w-full items-center justify-center gap-2 border border-[#111111] bg-white px-5 py-4 font-mono text-[10px] uppercase tracking-[0.2em] text-[#111111]"
+        >
+          <SlidersHorizontal size={14} strokeWidth={1.6} />
+          Filter & Sort
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-[#767676]">
+        <div className="flex items-center gap-1.5">
           <SlidersHorizontal size={11} />
-          <span>SHOWING {filteredProducts.length} DISTINCT MATCHING CODES</span>
+          <span>SHOWING {filteredProducts.length} CURATED PIECES</span>
         </div>
+        <button type="button" onClick={clearFilters} className="text-[#111111] hover:underline">
+          Clear All
+        </button>
       </div>
 
-      {/* STORY Elegant Grid layout featuring solid grid separators (border-t border-l, then border-b border-r on elements) */}
-      <div 
-        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 border-t border-l border-[#121212] overflow-hidden" 
+      <div
+        className="grid grid-cols-1 overflow-hidden border-l border-t border-[#121212] sm:grid-cols-2 lg:grid-cols-4"
         id="categories-grid-collection-view"
       >
-        {filteredProducts.map((p) => (
-          <div
-            key={p.id}
-            onClick={() => onSelectProduct(p)}
-            className="group cursor-pointer bg-white border-r border-b border-[#121212] flex flex-col justify-between"
-            id={`discover-card-${p.id}`}
+        {filteredProducts.map((product) => (
+          <button
+            key={product.id}
+            type="button"
+            onClick={() => onSelectProduct(product)}
+            className="group flex cursor-pointer flex-col justify-between border-r border-b border-[#121212] bg-white text-left"
+            id={`discover-card-${product.id}`}
           >
-            {/* Image Box - height scaled based on standard 0.73 aspect */}
-            <div className="aspect-[3/4.1] w-full overflow-hidden flex items-center justify-center bg-[#F6F5F2] relative">
+            <div className="relative flex aspect-[3/4.1] w-full items-center justify-center overflow-hidden bg-[#f6f5f2]">
               <img
-                src={p.image}
-                alt={p.name}
-                className="w-full h-full object-cover grayscale brightness-95 group-hover:scale-103 group-hover:grayscale-0 transition-all duration-500 ease-out"
+                src={product.image}
+                alt={product.name}
+                className="h-full w-full object-cover grayscale brightness-95 transition-all duration-500 ease-out group-hover:scale-[1.03] group-hover:grayscale-0"
                 referrerPolicy="no-referrer"
               />
-              
-              {/* Coming soon marker block logic on Silk Blouse or Leather Belt if desired, but we keep them clickable for detail */}
-              {(p.id === 'dolman-sleeve-blouse' || p.id === 'canvas-tote-bag') && (
-                <div className="absolute inset-0 bg-black/5 flex items-center justify-center backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="bg-[#121212]/95 border border-white/20 text-white font-mono text-[8.5px] px-3.5 py-2 tracking-[0.2em] uppercase">
-                    ACCOMPANYING PIECE
-                  </span>
-                </div>
-              )}
             </div>
-
-            {/* Bottom details card metadata bar with solid borders */}
-            <div className="p-4 flex justify-between items-start bg-white border-t border-[#121212]">
-              <div className="space-y-0.5 text-left truncate pr-2">
-                <h2 className="font-sans font-medium text-xs tracking-wider text-[#121212] uppercase truncate group-hover:underline">
-                  {p.name}
+            <div className="flex items-start justify-between border-t border-[#121212] bg-white p-4">
+              <div className="min-w-0 space-y-0.5 pr-2">
+                <h2 className="truncate text-xs font-medium uppercase tracking-wider text-[#121212] group-hover:underline">
+                  {product.name}
                 </h2>
-                <div className="flex items-center space-x-1.5 text-[#767676]">
+                <div className="flex items-center gap-1.5 text-[#767676]">
                   <span className="font-mono text-[8px] uppercase tracking-wider">
-                    {p.sizes ? p.sizes.join(' / ') : 'O/S'}
+                    {product.sizes ? product.sizes.join(' / ') : 'O/S'}
                   </span>
                   <span className="text-[7.5px]">/</span>
-                  <span className="font-mono text-[8px] uppercase tracking-wider truncate max-w-[80px]">
-                    {p.colors && p.colors.length > 0 ? p.colors[0].name : "ECRU"}
+                  <span className="max-w-[80px] truncate font-mono text-[8px] uppercase tracking-wider">
+                    {product.colors && product.colors.length > 0 ? product.colors[0].name : 'ECRU'}
                   </span>
                 </div>
               </div>
-              <span className="font-mono text-xs font-semibold text-[#121212] shrink-0 pt-0.5">
-                {formatINR(p.price)}
+              <span className="shrink-0 pt-0.5 font-mono text-xs font-semibold text-[#121212]">
+                {formatINR(product.price)}
               </span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
-      {/* If search list is empty */}
       {filteredProducts.length === 0 && (
-        <div className="text-center py-20 border border-dashed border-[#121212]/30 space-y-3" id="discover-empty-state">
-          <p className="font-mono text-xs text-[#767676] uppercase">
-            NO DESIGN COMPLIES WITH CURRENT CAPSULE CRITERIA.
-          </p>
-          <button 
-            onClick={clearSearch} 
-            className="bg-[#121212] text-white text-[9px] font-mono tracking-widest py-3 px-6 cursor-pointer hover:bg-black transition-colors uppercase font-bold"
+        <div className="space-y-3 border border-dashed border-[#121212]/30 py-20 text-center" id="discover-empty-state">
+          <p className="font-mono text-xs uppercase text-[#767676]">NO PIECES FOUND</p>
+          <p className="text-sm text-[#555555]">Try changing category, size, brand, or gender filters.</p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="bg-[#121212] px-6 py-3 font-mono text-[9px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-black"
           >
-            RESET CATALOG CODES
+            Reset Filters
           </button>
         </div>
       )}
 
+      <p className="text-center font-mono text-[10px] uppercase tracking-[0.22em] text-[#6f6f6f]">
+        Verified authentic pieces &bull; 100% original &bull; Best price & quality
+      </p>
+
+      <AnimatePresence>
+        {mobileFiltersOpen && (
+          <motion.div className="fixed inset-0 z-50 bg-black/40 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ duration: 0.28 }}
+              className="absolute bottom-0 left-0 right-0 max-h-[86vh] overflow-auto border-t border-[#111111] bg-white p-5"
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#111111]">Filter & Sort</p>
+                <button type="button" onClick={() => setMobileFiltersOpen(false)} aria-label="Close filters">
+                  <X size={18} strokeWidth={1.6} />
+                </button>
+              </div>
+              <div className="space-y-5">
+                <SelectDropdown label="Category" value={categoryValue} options={categoryDropdownOptions} active={activeDropdown === 'category'} onToggle={() => setActiveDropdown(activeDropdown === 'category' ? null : 'category')} onSelect={selectCategoryByLabel} />
+                <SelectDropdown label="Gender" value={genderValue} options={genderDropdownOptions} active={activeDropdown === 'gender'} onToggle={() => setActiveDropdown(activeDropdown === 'gender' ? null : 'gender')} onSelect={selectGenderByLabel} />
+                <SelectDropdown label="Size" value={selectedSize} options={sizeDropdownOptions} active={activeDropdown === 'size'} onToggle={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')} onSelect={(value) => { setSelectedSize(value); setActiveDropdown(null); }} />
+                <SelectDropdown label="Brand" value={selectedBrand} options={BRAND_OPTIONS} active={activeDropdown === 'brand'} onToggle={() => setActiveDropdown(activeDropdown === 'brand' ? null : 'brand')} onSelect={(value) => { setSelectedBrand(value); setActiveDropdown(null); }} />
+                <SelectDropdown label="Sort By" value={sortValue} options={sortOptions} active={activeDropdown === 'sort'} onToggle={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')} onSelect={selectSortByLabel} />
+              </div>
+              <div className="mt-8 grid grid-cols-2 gap-3">
+                <button type="button" onClick={clearFilters} className="border border-[#111111] px-5 py-3 font-mono text-[10px] uppercase tracking-[0.2em]">
+                  Clear All
+                </button>
+                <button type="button" onClick={() => setMobileFiltersOpen(false)} className="border border-[#111111] bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase tracking-[0.2em] text-white">
+                  Apply Filters
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

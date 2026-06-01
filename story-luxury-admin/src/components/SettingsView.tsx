@@ -6,14 +6,91 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, Info, ShieldCheck, Heart, Sparkles, CreditCard, ChevronRight } from 'lucide-react';
-import { StoreSettings } from '../types';
+import { Product, StoreSettings } from '../types';
 
 interface SettingsViewProps {
   settings: StoreSettings;
+  products: Product[];
   onSaveSettings: (updated: StoreSettings) => void;
 }
 
-export default function SettingsView({ settings, onSaveSettings }: SettingsViewProps) {
+const productKey = (product: Product) => product.id || product.sku;
+
+const ProductOrderPicker = ({
+  title,
+  description,
+  selectedIds,
+  products,
+  onChange
+}: {
+  title: string;
+  description: string;
+  selectedIds: string[];
+  products: Product[];
+  onChange: (ids: string[]) => void;
+}) => {
+  const addProduct = (id: string) => {
+    if (!id || selectedIds.includes(id)) return;
+    onChange([...selectedIds, id]);
+  };
+
+  const removeProduct = (id: string) => onChange(selectedIds.filter((item) => item !== id));
+  const moveProduct = (index: number, direction: -1 | 1) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= selectedIds.length) return;
+    const next = [...selectedIds];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    onChange(next);
+  };
+
+  const selectedProducts = selectedIds.map((id) => products.find((product) => productKey(product) === id)).filter(Boolean) as Product[];
+  const availableProducts = products.filter((product) => !selectedIds.includes(productKey(product)));
+
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+      <div className="mb-4">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-900">{title}</h4>
+        <p className="mt-1 text-xs leading-5 text-neutral-500">{description}</p>
+      </div>
+
+      <select
+        value=""
+        onChange={(event) => addProduct(event.target.value)}
+        className="w-full rounded-lg border border-neutral-200 bg-white p-2.5 text-xs outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+      >
+        <option value="">Add product to this section</option>
+        {availableProducts.map((product) => (
+          <option key={productKey(product)} value={productKey(product)}>
+            {product.name}
+          </option>
+        ))}
+      </select>
+
+      <div className="mt-4 space-y-2">
+        {selectedProducts.length === 0 ? (
+          <div className="border border-dashed border-neutral-300 bg-white p-4 text-xs text-neutral-500">
+            No manual order selected. Storefront will fall back to the live product catalog.
+          </div>
+        ) : (
+          selectedProducts.map((product, index) => (
+            <div key={productKey(product)} className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-2">
+              <img src={product.image} alt="" className="h-12 w-10 rounded object-cover grayscale" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-neutral-900">{product.name}</p>
+                <p className="font-mono text-[10px] uppercase text-neutral-400">{product.category}</p>
+              </div>
+              <button type="button" onClick={() => moveProduct(index, -1)} className="rounded border border-neutral-200 px-2 py-1 text-[10px] uppercase text-neutral-600 disabled:opacity-30" disabled={index === 0}>Up</button>
+              <button type="button" onClick={() => moveProduct(index, 1)} className="rounded border border-neutral-200 px-2 py-1 text-[10px] uppercase text-neutral-600 disabled:opacity-30" disabled={index === selectedProducts.length - 1}>Down</button>
+              <button type="button" onClick={() => removeProduct(productKey(product))} className="rounded bg-neutral-950 px-2 py-1 text-[10px] uppercase text-white">Remove</button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default function SettingsView({ settings, products, onSaveSettings }: SettingsViewProps) {
   const [storeName, setStoreName] = useState(settings.storeName);
   const [currency, setCurrency] = useState(settings.currency);
   const [contactEmail, setContactEmail] = useState(settings.contactEmail);
@@ -36,15 +113,22 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
   const [heroBadgeText, setHeroBadgeText] = useState(settings.heroBadgeText);
   const [productsEyebrow, setProductsEyebrow] = useState(settings.productsEyebrow);
   const [productsTitle, setProductsTitle] = useState(settings.productsTitle);
+  const [homeProductIds, setHomeProductIds] = useState(settings.homeProductIds);
   const [collectionEyebrow, setCollectionEyebrow] = useState(settings.collectionEyebrow);
   const [collectionTitle, setCollectionTitle] = useState(settings.collectionTitle);
   const [collectionBody, setCollectionBody] = useState(settings.collectionBody);
   const [collectionImage, setCollectionImage] = useState(settings.collectionImage);
+  const [collectionProductIds, setCollectionProductIds] = useState(settings.collectionProductIds);
+  const [discoverEyebrow, setDiscoverEyebrow] = useState(settings.discoverEyebrow);
+  const [discoverTitle, setDiscoverTitle] = useState(settings.discoverTitle);
+  const [discoverSearchPlaceholder, setDiscoverSearchPlaceholder] = useState(settings.discoverSearchPlaceholder);
+  const [discoverTagLabel, setDiscoverTagLabel] = useState(settings.discoverTagLabel);
   const [jewelryEyebrow, setJewelryEyebrow] = useState(settings.jewelryEyebrow);
   const [jewelryTitle, setJewelryTitle] = useState(settings.jewelryTitle);
   const [jewelryBody, setJewelryBody] = useState(settings.jewelryBody);
   const [recommendationEyebrow, setRecommendationEyebrow] = useState(settings.recommendationEyebrow);
   const [recommendationTitle, setRecommendationTitle] = useState(settings.recommendationTitle);
+  const [recommendationProductIds, setRecommendationProductIds] = useState(settings.recommendationProductIds);
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -78,15 +162,22 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
         heroBadgeText,
         productsEyebrow,
         productsTitle,
+        homeProductIds,
         collectionEyebrow,
         collectionTitle,
         collectionBody,
         collectionImage,
+        collectionProductIds,
+        discoverEyebrow,
+        discoverTitle,
+        discoverSearchPlaceholder,
+        discoverTagLabel,
         jewelryEyebrow,
         jewelryTitle,
         jewelryBody,
         recommendationEyebrow,
-        recommendationTitle
+        recommendationTitle,
+        recommendationProductIds
       });
       setSaving(false);
       setSuccess(true);
@@ -290,6 +381,25 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
 
           <div className="grid grid-cols-1 gap-5 border-t border-neutral-100 pt-5 text-xs font-sans md:grid-cols-2">
             <div className="flex flex-col gap-2">
+              <label className="font-semibold text-neutral-700">Collections Page Eyebrow</label>
+              <input value={discoverEyebrow} onChange={e => setDiscoverEyebrow(e.target.value)} className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-semibold text-neutral-700">Collections Page Title</label>
+              <input value={discoverTitle} onChange={e => setDiscoverTitle(e.target.value)} className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-semibold text-neutral-700">Search Placeholder</label>
+              <input value={discoverSearchPlaceholder} onChange={e => setDiscoverSearchPlaceholder(e.target.value)} className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-semibold text-neutral-700">Tag Row Label</label>
+              <input value={discoverTagLabel} onChange={e => setDiscoverTagLabel(e.target.value)} className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 border-t border-neutral-100 pt-5 text-xs font-sans md:grid-cols-2">
+            <div className="flex flex-col gap-2">
               <label className="font-semibold text-neutral-700">Jewelry Eyebrow</label>
               <input value={jewelryEyebrow} onChange={e => setJewelryEyebrow(e.target.value)} className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
             </div>
@@ -309,6 +419,30 @@ export default function SettingsView({ settings, onSaveSettings }: SettingsViewP
               <label className="font-semibold text-neutral-700">Recommendation Title</label>
               <input value={recommendationTitle} onChange={e => setRecommendationTitle(e.target.value)} className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 border-t border-neutral-100 pt-5 lg:grid-cols-3">
+            <ProductOrderPicker
+              title="Main Page Products"
+              description="Controls the exact products and order shown under Seasonal selection / Our Products."
+              selectedIds={homeProductIds}
+              products={products}
+              onChange={setHomeProductIds}
+            />
+            <ProductOrderPicker
+              title="Collections Page"
+              description="Controls product order on the Collections grid. Leave empty to use the full catalog."
+              selectedIds={collectionProductIds}
+              products={products}
+              onChange={setCollectionProductIds}
+            />
+            <ProductOrderPicker
+              title="Recommendation"
+              description="Controls the recommendation row at the bottom of the homepage."
+              selectedIds={recommendationProductIds}
+              products={products}
+              onChange={setRecommendationProductIds}
+            />
           </div>
         </div>
 

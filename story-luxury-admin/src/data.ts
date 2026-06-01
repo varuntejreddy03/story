@@ -353,13 +353,20 @@ export const defaultSettings: StoreSettings = {
   heroBadgeText: 'Tailored quiet luxury',
   productsEyebrow: 'Seasonal selection',
   productsTitle: 'Our Products',
+  homeProductIds: ['wide-legged-pants', 'relaxed-linen-shirt', 'crew-neck-sweater', 'classic-mini-dress', 'canvas-tote-bag', 'elongated-blazer', 'oversized-wool-coat', 'rib-knit-tank-top'],
   collectionEyebrow: 'Curated combinations',
   collectionTitle: 'Perfect Match',
   collectionBody: 'Explore curated collections designed to complement your style with comfort and confidence.',
   collectionImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=85',
+  collectionProductIds: [],
+  discoverEyebrow: 'OUR COMPLETE CODES',
+  discoverTitle: 'COLLECTIONS',
+  discoverSearchPlaceholder: 'SEARCH PRODUCTS, STYLING OR RELEASES...',
+  discoverTagLabel: 'STYLING DIARY:',
   jewelryEyebrow: 'Accessories edit',
   jewelryTitle: 'Story Jewelry',
   jewelryBody: 'Adorn yourself with timeless accessories that complete every look.',
   recommendationEyebrow: 'Selected next',
-  recommendationTitle: 'Recommendation'
+  recommendationTitle: 'Recommendation',
+  recommendationProductIds: ['linen-wide-pants', 'faux-leather-jacket', 'gray-tube-top', 'drawstring-linen-pants', 'convertible-crossbody-bag']
 };

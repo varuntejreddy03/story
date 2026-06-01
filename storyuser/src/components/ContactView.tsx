@@ -5,6 +5,13 @@ import { ActiveScreen } from '../types';
 
 interface ContactViewProps {
   setActiveScreen: (screen: ActiveScreen) => void;
+  onSubmitRequest: (payload: {
+    name: string;
+    email: string;
+    phone?: string;
+    topic: string;
+    message: string;
+  }) => Promise<unknown>;
 }
 
 const CONTACT_METHODS = [
@@ -34,8 +41,10 @@ const STUDIOS = [
   ['Bengaluru Styling Desk', 'Indiranagar, Bengaluru, Karnataka 560038']
 ];
 
-export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen }) => {
+export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen, onSubmitRequest }) => {
   const [submitted, setSubmitted] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
   const [formState, setFormState] = React.useState({
     name: '',
     email: '',
@@ -44,16 +53,26 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen }) => 
     message: ''
   });
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
-    setFormState({
-      name: '',
-      email: '',
-      phone: '',
-      topic: 'STYLING APPOINTMENT',
-      message: ''
-    });
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      await onSubmitRequest(formState);
+      setSubmitted(true);
+      setFormState({
+        name: '',
+        email: '',
+        phone: '',
+        topic: 'STYLING APPOINTMENT',
+        message: ''
+      });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Could not send request.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -107,6 +126,12 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen }) => 
             {submitted && (
               <div className="border border-[#111111] bg-[#fafafa] p-4 font-mono text-[10px] uppercase leading-relaxed text-[#111111] sm:col-span-2">
                 Your STORY India request has been received. Client care will respond shortly.
+              </div>
+            )}
+
+            {submitError && (
+              <div className="border border-[#111111] bg-white p-4 font-mono text-[10px] uppercase leading-relaxed text-[#111111] sm:col-span-2">
+                {submitError}
               </div>
             )}
 
@@ -172,9 +197,10 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen }) => 
 
           <button
             type="submit"
+            disabled={submitting}
             className="mt-8 inline-flex w-full items-center justify-center gap-2 bg-[#111111] px-6 py-4 font-mono text-[10px] font-semibold uppercase text-white transition hover:bg-black sm:w-auto"
           >
-            Send Request
+            {submitting ? 'Sending...' : 'Send Request'}
             <ArrowRight size={14} strokeWidth={1.6} />
           </button>
         </form>

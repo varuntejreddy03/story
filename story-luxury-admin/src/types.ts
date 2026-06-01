@@ -71,6 +71,17 @@ export interface Coupon {
   expiryDate: string;
 }
 
+export interface ContactRequest {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  topic: string;
+  message: string;
+  status: 'new' | 'reviewing' | 'closed';
+  createdAt: string;
+}
+
 export interface StoreSettings {
   storeName: string;
   currency: string;
@@ -93,13 +104,20 @@ export interface StoreSettings {
   heroBadgeText: string;
   productsEyebrow: string;
   productsTitle: string;
+  homeProductIds: string[];
   collectionEyebrow: string;
   collectionTitle: string;
   collectionBody: string;
   collectionImage: string;
+  collectionProductIds: string[];
+  discoverEyebrow: string;
+  discoverTitle: string;
+  discoverSearchPlaceholder: string;
+  discoverTagLabel: string;
   jewelryEyebrow: string;
   jewelryTitle: string;
   jewelryBody: string;
   recommendationEyebrow: string;
   recommendationTitle: string;
+  recommendationProductIds: string[];
 }

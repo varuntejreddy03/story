@@ -18,6 +18,7 @@ import { paymentRouter, razorpayWebhookHandler } from './modules/payment/router.
 import { settingsRouter, adminSettingsRouter } from './modules/settings/router.js';
 import { profileRouter } from './modules/profile/router.js';
 import { adminRouter } from './modules/admin/router.js';
+import { contactRouter, adminContactRouter } from './modules/contact/router.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 const app = express();
@@ -88,12 +89,14 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/profile', profileRouter);
+app.use('/api/contact', contactRouter);
 
 app.use('/api/admin/products', adminProductsRouter);
 app.use('/api/admin/categories', adminCategoriesRouter);
 app.use('/api/admin/coupons', adminCouponsRouter);
 app.use('/api/admin/orders', adminOrdersRouter);
 app.use('/api/admin/settings', adminSettingsRouter);
+app.use('/api/admin/contact-requests', adminContactRouter);
 app.use('/api/admin', adminRouter);
 
 app.use(notFound);

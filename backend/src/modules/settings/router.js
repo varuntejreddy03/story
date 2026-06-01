@@ -33,15 +33,22 @@ settingsRouter.get('/', asyncHandler(async (_req, res) => {
     'home_hero_badge_text',
     'home_products_eyebrow',
     'home_products_title',
+    'home_products_ids',
     'home_collection_eyebrow',
     'home_collection_title',
     'home_collection_body',
     'home_collection_image',
+    'home_collection_product_ids',
+    'discover_eyebrow',
+    'discover_title',
+    'discover_search_placeholder',
+    'discover_tag_label',
     'home_jewelry_eyebrow',
     'home_jewelry_title',
     'home_jewelry_body',
     'home_recommendation_eyebrow',
-    'home_recommendation_title'
+    'home_recommendation_title',
+    'home_recommendation_ids'
   ];
   const settings = await prisma.setting.findMany({ where: { key: { in: safeKeys } } });
   res.json({ success: true, data: toObject(settings) });

@@ -84,15 +84,24 @@ export interface StorefrontContent {
   heroBadgeText: string;
   productsEyebrow: string;
   productsTitle: string;
+  homeProductIds: string[];
   collectionEyebrow: string;
   collectionTitle: string;
   collectionBody: string;
   collectionImage: string;
+  collectionProductIds: string[];
+  discoverEyebrow: string;
+  discoverTitle: string;
+  discoverSearchPlaceholder: string;
+  discoverTagLabel: string;
   jewelryEyebrow: string;
   jewelryTitle: string;
   jewelryBody: string;
   recommendationEyebrow: string;
   recommendationTitle: string;
+  recommendationProductIds: string[];
 }
 
-export type ActiveScreen = 'shop' | 'about' | 'contact' | 'discover' | 'detail' | 'settings' | 'confirmation' | 'login' | 'bag';
+export type StoryCategoryKey = 'uppers' | 'lowers' | 'dresses' | 'co-ords' | 'footwear' | 'accessories' | 'inners';
+
+export type ActiveScreen = 'shop' | 'about' | 'contact' | 'discover' | 'category' | 'detail' | 'settings' | 'confirmation' | 'login' | 'bag';

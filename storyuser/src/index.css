@@ -38,3 +38,27 @@ body {
 input:focus, select:focus, textarea:focus {
   outline: none;
 }
+
+@keyframes story-brand-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.brand-marquee {
+  animation: story-brand-marquee 42s linear infinite;
+  will-change: transform;
+}
+
+.brand-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-marquee {
+    animation-duration: 120s;
+  }
+}

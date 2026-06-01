@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActiveScreen, Product, CartItem, UserProfile, Address, Order, ColorOption, StorefrontContent } from './types';
+import { ActiveScreen, Product, CartItem, UserProfile, Address, Order, ColorOption, StorefrontContent, StoryCategoryKey } from './types';
 import { PRODUCTS, INITIAL_USER_PROFILE } from './data';
 import { storyApi } from './api';
 import { Navbar } from './components/Navbar';
@@ -8,12 +8,14 @@ import { ShopView } from './components/ShopView';
 import { AboutView } from './components/AboutView';
 import { ContactView } from './components/ContactView';
 import { DiscoverView } from './components/DiscoverView';
+import { CategoryGenderView } from './components/CategoryGenderView';
 import { ProductDetailView } from './components/ProductDetailView';
 import { SettingsView } from './components/SettingsView';
 import { OrderConfirmationView } from './components/OrderConfirmationView';
 import { CartDrawer } from './components/CartDrawer';
 import { LoginView } from './components/LoginView';
 import { BagView } from './components/BagView';
+import { LEGACY_CATEGORY_ALIASES, STORY_CATEGORIES } from './categoryConfig';
 
 declare global {
   interface Window {
@@ -63,11 +65,11 @@ const loadRazorpay = () => new Promise<boolean>((resolve) => {
 });
 
 const DEFAULT_STOREFRONT_CONTENT: StorefrontContent = {
-  heroEyebrow: 'New editorial capsule',
-  heroTitle: 'Our Latest Story',
-  heroBody: 'Discover timeless fashion pieces crafted in India for everyday elegance.',
-  heroPrimaryCta: 'Shop Edit',
-  heroSecondaryCta: 'View Lookbook',
+  heroEyebrow: 'NEW EDITORIAL CAPSULE',
+  heroTitle: 'OUR LATEST STORY',
+  heroBody: 'Discover verified branded fashion, curated in India for everyday premium style.',
+  heroPrimaryCta: 'SHOP THE DROP',
+  heroSecondaryCta: 'EXPLORE STYLE EDIT',
   heroImagePrimary: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85',
   heroImageSecondary: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
   heroImageDetail: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=700&q=85',
@@ -75,20 +77,62 @@ const DEFAULT_STOREFRONT_CONTENT: StorefrontContent = {
   heroBadgeText: 'Tailored quiet luxury',
   productsEyebrow: 'Seasonal selection',
   productsTitle: 'Our Products',
+  homeProductIds: [],
   collectionEyebrow: 'Curated combinations',
   collectionTitle: 'Perfect Match',
   collectionBody: 'Explore curated collections designed to complement your style with comfort and confidence.',
   collectionImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=85',
+  collectionProductIds: [],
+  discoverEyebrow: 'OUR COMPLETE CODES',
+  discoverTitle: 'COLLECTIONS',
+  discoverSearchPlaceholder: 'SEARCH PRODUCTS, STYLING OR RELEASES...',
+  discoverTagLabel: 'STYLING DIARY:',
   jewelryEyebrow: 'Accessories edit',
   jewelryTitle: 'Story Jewelry',
   jewelryBody: 'Adorn yourself with timeless accessories that complete every look.',
   recommendationEyebrow: 'Selected next',
-  recommendationTitle: 'Recommendation'
+  recommendationTitle: 'Recommendation',
+  recommendationProductIds: ['linen-wide-pants', 'faux-leather-jacket', 'gray-tube-top', 'drawstring-linen-pants', 'convertible-crossbody-bag']
+};
+
+const STORY_CATEGORY_KEYS = STORY_CATEGORIES.map((category) => category.key);
+
+const parseRoute = (): { screen: ActiveScreen; category: StoryCategoryKey } => {
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  const categoryMatch = path.match(/^\/category\/([^/]+)$/);
+  const rawCategory = categoryMatch?.[1];
+  const category = rawCategory
+    ? (LEGACY_CATEGORY_ALIASES[rawCategory] || rawCategory) as StoryCategoryKey
+    : undefined;
+
+  if (category && STORY_CATEGORY_KEYS.includes(category)) {
+    return { screen: 'category', category };
+  }
+
+  if (path === '/collections') return { screen: 'discover', category: 'uppers' };
+  if (path === '/about') return { screen: 'about', category: 'uppers' };
+  if (path === '/contact') return { screen: 'contact', category: 'uppers' };
+  if (path === '/account') return { screen: 'settings', category: 'uppers' };
+  if (path === '/bag') return { screen: 'bag', category: 'uppers' };
+
+  return { screen: 'shop', category: 'uppers' };
+};
+
+const screenPath = (screen: ActiveScreen, category: StoryCategoryKey) => {
+  if (screen === 'category') return `/category/${category}`;
+  if (screen === 'discover') return '/collections';
+  if (screen === 'about') return '/about';
+  if (screen === 'contact') return '/contact';
+  if (screen === 'settings') return '/account';
+  if (screen === 'bag') return '/bag';
+  return '/';
 };
 
 export default function App() {
-  const [activeScreen, setActiveScreen] = React.useState<ActiveScreen>('shop');
+  const initialRoute = React.useMemo(() => parseRoute(), []);
+  const [activeScreen, setActiveScreen] = React.useState<ActiveScreen>(initialRoute.screen);
   const [activeProduct, setActiveProduct] = React.useState<Product | null>(null);
+  const [activeStoryCategory, setActiveStoryCategory] = React.useState<StoryCategoryKey>(initialRoute.category);
   const [products, setProducts] = React.useState<Product[]>(PRODUCTS);
   const [storefrontContent, setStorefrontContent] = React.useState<StorefrontContent>(DEFAULT_STOREFRONT_CONTENT);
   const [orders, setOrders] = React.useState<Order[]>([]);
@@ -171,6 +215,29 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeScreen, activeProduct]);
 
+  React.useEffect(() => {
+    const handlePopState = () => {
+      const route = parseRoute();
+      setActiveStoryCategory(route.category);
+      setActiveProduct(null);
+      setActiveScreen(route.screen);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = React.useCallback((screen: ActiveScreen, category = activeStoryCategory) => {
+    setActiveStoryCategory(category);
+    setActiveProduct(null);
+    setActiveScreen(screen);
+
+    const nextPath = screenPath(screen, category);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, '', nextPath);
+    }
+  }, [activeStoryCategory]);
+
   const cartBadgeCount = React.useMemo(
     () => cartItems.reduce((acc, curr) => acc + curr.quantity, 0),
     [cartItems]
@@ -246,6 +313,10 @@ export default function App() {
   const handleSelectProduct = (product: Product) => {
     setActiveProduct(product);
     setActiveScreen('detail');
+  };
+
+  const handleOpenStoryCategory = (category: StoryCategoryKey) => {
+    navigateTo('category', category);
   };
 
   const ensureCheckoutAddress = async () => {
@@ -360,8 +431,7 @@ export default function App() {
       <Navbar
         activeScreen={activeScreen}
         setActiveScreen={(scr) => {
-          setActiveScreen(scr);
-          setActiveProduct(null);
+          navigateTo(scr);
         }}
         cartCount={cartBadgeCount}
         onCartToggle={() => setCartOpen(prev => !prev)}
@@ -379,7 +449,8 @@ export default function App() {
             products={products}
             content={storefrontContent}
             onSelectProduct={handleSelectProduct}
-            setActiveScreen={(screen) => setActiveScreen(screen as ActiveScreen)}
+            onOpenCategory={handleOpenStoryCategory}
+            setActiveScreen={(screen) => navigateTo(screen as ActiveScreen)}
           />
         )}
 
@@ -388,12 +459,25 @@ export default function App() {
         )}
 
         {activeScreen === 'contact' && (
-          <ContactView setActiveScreen={(screen) => setActiveScreen(screen)} />
+          <ContactView
+            setActiveScreen={(screen) => setActiveScreen(screen)}
+            onSubmitRequest={(payload) => storyApi.createContactRequest(payload)}
+          />
         )}
 
         {activeScreen === 'discover' && (
           <DiscoverView
             products={products}
+            content={storefrontContent}
+            onSelectProduct={handleSelectProduct}
+          />
+        )}
+
+        {activeScreen === 'category' && (
+          <CategoryGenderView
+            categoryKey={activeStoryCategory}
+            products={products}
+            onBack={() => navigateTo('shop')}
             onSelectProduct={handleSelectProduct}
           />
         )}
@@ -484,8 +568,7 @@ export default function App() {
 
       <Footer
         setActiveScreen={(scr) => {
-          setActiveScreen(scr);
-          setActiveProduct(null);
+          navigateTo(scr);
         }}
       />
     </div>

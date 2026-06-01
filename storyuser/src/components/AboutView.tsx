@@ -24,24 +24,24 @@ const ABOUT_IMAGES = [
 
 const VALUES = [
   {
-    title: 'Form',
-    text: 'Clean silhouettes, deliberate proportion, and quiet structure for pieces that hold their shape without feeling rigid.'
+    title: 'Authentic',
+    text: 'Every piece is checked for brand identity, condition, finish, and everyday wearability before it enters the STORY edit.'
   },
   {
-    title: 'Material',
-    text: 'Linen, wool, cotton, and textured knits chosen for touch, drape, and the way they age inside a real wardrobe.'
+    title: 'Curated',
+    text: 'We select branded fashion for Indian wardrobes: sharp layers, premium basics, clean footwear, and easy occasion pieces.'
   },
   {
-    title: 'Purpose',
-    text: 'Clothing designed to move through daily life with ease, from morning routines to late city evenings.'
+    title: 'Value',
+    text: 'The goal is simple: original branded fashion, better prices, and quality that feels worth returning to.'
   }
 ];
 
 const STATS = [
   ['2026', 'Founded'],
-  ['8', 'Core categories'],
-  ['700+', 'Curated edits'],
-  ['5+', 'Collaborations']
+  ['7', 'Core categories'],
+  ['100%', 'Original focus'],
+  ['INDIA', 'Curated for']
 ];
 
 export const AboutView: React.FC<AboutViewProps> = ({ setActiveScreen }) => {
@@ -57,18 +57,18 @@ export const AboutView: React.FC<AboutViewProps> = ({ setActiveScreen }) => {
       <section className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 pb-16 pt-10 sm:px-6 md:pt-16 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16 lg:px-8">
         <div className="space-y-8">
           <div className="space-y-5">
-            <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">About STORY</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#6f6f6f]">About STORY India</p>
             <h1 className="font-display text-6xl font-black uppercase leading-none text-[#050505] sm:text-7xl lg:text-8xl">
-              A Wardrobe With Memory
+              Verified Fashion, Curated In India
             </h1>
           </div>
 
           <div className="max-w-xl space-y-5 text-sm leading-7 text-[#4c4c4c]">
             <p>
-              STORY is an Indian premium fashion house built around timeless essentials, quiet detail, and the intimacy of daily dressing.
+              STORY is a premium India-based fashion store built for people who want original branded pieces without the noise of fast, careless shopping.
             </p>
             <p>
-              Each piece is designed in India to feel composed without excess: monochrome layers, precise texture, and silhouettes that can be returned to season after season.
+              We curate verified branded fashion across uppers, lowers, dresses, co-ords, footwear, accessories, and inners, with a focus on authenticity, condition, price, and everyday Indian style.
             </p>
           </div>
 
@@ -78,7 +78,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ setActiveScreen }) => {
               onClick={() => setActiveScreen('shop')}
               className="inline-flex items-center gap-2 bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase text-white transition hover:bg-black"
             >
-              Shop STORY
+              Shop Verified Picks
               <ArrowRight size={14} strokeWidth={1.6} />
             </button>
             <button
@@ -86,7 +86,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ setActiveScreen }) => {
               onClick={() => setActiveScreen('discover')}
               className="inline-flex items-center gap-2 border border-[#111111] bg-transparent px-5 py-3 font-mono text-[10px] uppercase text-[#111111] transition hover:bg-white"
             >
-              View Collections
+              View Curated Drops
               <ArrowRight size={14} strokeWidth={1.6} />
             </button>
           </div>
@@ -119,9 +119,9 @@ export const AboutView: React.FC<AboutViewProps> = ({ setActiveScreen }) => {
           </div>
           <div className="col-span-3 row-span-3 flex items-end bg-white p-5 shadow-[0_14px_42px_rgba(0,0,0,0.06)]">
             <div>
-              <p className="font-mono text-[9px] uppercase text-[#6f6f6f]">INDIA / EST 2026</p>
+              <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#6f6f6f]">INDIA / EST 2026</p>
               <p className="mt-3 text-xl font-medium leading-tight">
-                Minimal clothing for the moments that become personal history.
+                Premium branded fashion, checked, styled, and priced for modern Indian wardrobes.
               </p>
             </div>
           </div>
@@ -142,9 +142,9 @@ export const AboutView: React.FC<AboutViewProps> = ({ setActiveScreen }) => {
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
           <div>
-            <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">Design language</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#6f6f6f]">Our standard</p>
             <h2 className="mt-3 font-display text-5xl font-black uppercase leading-none sm:text-6xl">
-              Quiet Pieces, Clear Intention
+              Original Pieces, Clear Checks
             </h2>
           </div>
 
@@ -162,12 +162,12 @@ export const AboutView: React.FC<AboutViewProps> = ({ setActiveScreen }) => {
       <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 overflow-hidden bg-[#111111] text-white lg:grid-cols-[1fr_0.8fr]">
           <div className="p-8 sm:p-12 lg:p-16">
-            <p className="font-mono text-[10px] uppercase text-[#9f9f9a]">The STORY standard</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#9f9f9a]">The STORY promise</p>
             <h2 className="mt-4 max-w-3xl font-display text-5xl font-black uppercase leading-none sm:text-6xl">
-              Built For Repetition, Not Noise
+              Verified Authentic. Best Price. Better Quality.
             </h2>
             <p className="mt-6 max-w-xl text-sm leading-7 text-[#d7d7d2]">
-              We focus on garments that earn repeated wear: a blazer with balance, a dress with restraint, a knit with softness, and accessories that complete the line.
+              From first scroll to final delivery, STORY keeps the edit focused: real branded pieces, clean product presentation, reliable support, and fashion that fits Indian everyday life.
             </p>
           </div>
           <div className="min-h-[360px] overflow-hidden bg-[#222222]">

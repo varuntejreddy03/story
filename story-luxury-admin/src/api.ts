@@ -1,4 +1,4 @@
-import { Category, Coupon, Customer, Order, PaymentTransaction, Product, StoreSettings } from './types';
+import { Category, ContactRequest, Coupon, Customer, Order, PaymentTransaction, Product, StoreSettings } from './types';
 
 const API_BASE_URL = (((import.meta as any).env?.VITE_API_BASE_URL as string | undefined) || 'http://localhost:5000/api').replace(/\/$/, '');
 
@@ -129,6 +129,14 @@ const asBoolean = (value: unknown, fallback = false) => {
   return String(value).toLowerCase() === 'true';
 };
 
+const listFromSetting = (value: unknown, fallback: string[] = []) => {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value !== 'string') return fallback;
+  return value.split(',').map((item) => item.trim()).filter(Boolean);
+};
+
+const settingList = (value: string[]) => value.filter(Boolean).join(',');
+
 const mapSettings = (settings: any): StoreSettings => ({
   storeName: settings.store_name || settings.storeName || 'STORY India',
   currency: settings.razorpay_currency || settings.currency || 'INR',
@@ -151,15 +159,33 @@ const mapSettings = (settings: any): StoreSettings => ({
   heroBadgeText: settings.home_hero_badge_text || settings.heroBadgeText || 'Tailored quiet luxury',
   productsEyebrow: settings.home_products_eyebrow || settings.productsEyebrow || 'Seasonal selection',
   productsTitle: settings.home_products_title || settings.productsTitle || 'Our Products',
+  homeProductIds: listFromSetting(settings.home_products_ids || settings.homeProductIds, ['wide-legged-pants', 'relaxed-linen-shirt', 'crew-neck-sweater', 'classic-mini-dress', 'canvas-tote-bag', 'elongated-blazer', 'oversized-wool-coat', 'rib-knit-tank-top']),
   collectionEyebrow: settings.home_collection_eyebrow || settings.collectionEyebrow || 'Curated combinations',
   collectionTitle: settings.home_collection_title || settings.collectionTitle || 'Perfect Match',
   collectionBody: settings.home_collection_body || settings.collectionBody || 'Explore curated collections designed to complement your style with comfort and confidence.',
   collectionImage: settings.home_collection_image || settings.collectionImage || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=85',
+  collectionProductIds: listFromSetting(settings.home_collection_product_ids || settings.collectionProductIds, []),
+  discoverEyebrow: settings.discover_eyebrow || settings.discoverEyebrow || 'OUR COMPLETE CODES',
+  discoverTitle: settings.discover_title || settings.discoverTitle || 'COLLECTIONS',
+  discoverSearchPlaceholder: settings.discover_search_placeholder || settings.discoverSearchPlaceholder || 'SEARCH PRODUCTS, STYLING OR RELEASES...',
+  discoverTagLabel: settings.discover_tag_label || settings.discoverTagLabel || 'STYLING DIARY:',
   jewelryEyebrow: settings.home_jewelry_eyebrow || settings.jewelryEyebrow || 'Accessories edit',
   jewelryTitle: settings.home_jewelry_title || settings.jewelryTitle || 'Story Jewelry',
   jewelryBody: settings.home_jewelry_body || settings.jewelryBody || 'Adorn yourself with timeless accessories that complete every look.',
   recommendationEyebrow: settings.home_recommendation_eyebrow || settings.recommendationEyebrow || 'Selected next',
-  recommendationTitle: settings.home_recommendation_title || settings.recommendationTitle || 'Recommendation'
+  recommendationTitle: settings.home_recommendation_title || settings.recommendationTitle || 'Recommendation',
+  recommendationProductIds: listFromSetting(settings.home_recommendation_ids || settings.recommendationProductIds, ['linen-wide-pants', 'faux-leather-jacket', 'gray-tube-top', 'drawstring-linen-pants', 'convertible-crossbody-bag'])
+});
+
+const mapContactRequest = (request: any): ContactRequest => ({
+  id: String(request.id),
+  name: request.name || 'Client',
+  email: request.email || '',
+  phone: request.phone || '',
+  topic: request.topic || '',
+  message: request.message || '',
+  status: request.status || 'new',
+  createdAt: request.createdAt || ''
 });
 
 const compactObject = (value: Record<string, unknown>) =>
@@ -248,15 +274,22 @@ const settingsPayload = (settings: StoreSettings) => ({
   home_hero_badge_text: settings.heroBadgeText,
   home_products_eyebrow: settings.productsEyebrow,
   home_products_title: settings.productsTitle,
+  home_products_ids: settingList(settings.homeProductIds),
   home_collection_eyebrow: settings.collectionEyebrow,
   home_collection_title: settings.collectionTitle,
   home_collection_body: settings.collectionBody,
   home_collection_image: settings.collectionImage,
+  home_collection_product_ids: settingList(settings.collectionProductIds),
+  discover_eyebrow: settings.discoverEyebrow,
+  discover_title: settings.discoverTitle,
+  discover_search_placeholder: settings.discoverSearchPlaceholder,
+  discover_tag_label: settings.discoverTagLabel,
   home_jewelry_eyebrow: settings.jewelryEyebrow,
   home_jewelry_title: settings.jewelryTitle,
   home_jewelry_body: settings.jewelryBody,
   home_recommendation_eyebrow: settings.recommendationEyebrow,
-  home_recommendation_title: settings.recommendationTitle
+  home_recommendation_title: settings.recommendationTitle,
+  home_recommendation_ids: settingList(settings.recommendationProductIds)
 });
 
 export const adminApi = {
@@ -332,5 +365,11 @@ export const adminApi = {
     mapSettings(await apiRequest('/admin/settings', {
       method: 'PUT',
       body: JSON.stringify(settingsPayload(settings))
+    })),
+  contactRequests: async () => (await apiRequest<any[]>('/admin/contact-requests')).map(mapContactRequest),
+  updateContactRequestStatus: async (id: string, status: ContactRequest['status']) =>
+    mapContactRequest(await apiRequest(`/admin/contact-requests/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
     }))
 };

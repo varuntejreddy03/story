@@ -15,6 +15,7 @@ import {
   Inbox, 
   CreditCard, 
   Settings, 
+  MessageSquare,
   Clock, 
   ChevronRight,
   Menu,
@@ -24,7 +25,7 @@ import {
 } from 'lucide-react';
 
 // Models & mock seeds
-import { Product, Order, Category, Customer, PaymentTransaction, Coupon, StoreSettings } from './types';
+import { Product, Order, Category, Customer, PaymentTransaction, Coupon, StoreSettings, ContactRequest } from './types';
 import { 
   defaultSettings 
 } from './data';
@@ -40,11 +41,12 @@ import CustomersView from './components/CustomersView';
 import InventoryView from './components/InventoryView';
 import PaymentsView from './components/PaymentsView';
 import SettingsView from './components/SettingsView';
+import ClientRequestsView from './components/ClientRequestsView';
 
 // Overlay action modals
 import { AddProductModal, AddCategoryModal, CreateCouponModal } from './components/Modals';
 
-type ViewTab = 'Dashboard' | 'Orders' | 'Products' | 'Categories' | 'Coupons' | 'Customers' | 'Inventory' | 'Payments' | 'Settings';
+type ViewTab = 'Dashboard' | 'Orders' | 'Products' | 'Categories' | 'Coupons' | 'Customers' | 'Inventory' | 'Payments' | 'Requests' | 'Settings';
 
 export default function App() {
   // Current active view tab
@@ -65,6 +67,7 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [contactRequests, setContactRequests] = useState<ContactRequest[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(defaultSettings);
 
   // Modal display toggles
@@ -87,6 +90,7 @@ export default function App() {
         customersData,
         transactionsData,
         couponsData,
+        contactRequestsData,
         settingsData
       ] = await Promise.all([
         adminApi.products(),
@@ -95,6 +99,7 @@ export default function App() {
         adminApi.customers(),
         adminApi.payments(),
         adminApi.coupons(),
+        adminApi.contactRequests(),
         adminApi.settings()
       ]);
 
@@ -104,6 +109,7 @@ export default function App() {
       setCustomers(customersData);
       setTransactions(transactionsData);
       setCoupons(couponsData);
+      setContactRequests(contactRequestsData);
       setSettings(settingsData);
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Could not load admin data.');
@@ -113,6 +119,7 @@ export default function App() {
       setCustomers([]);
       setTransactions([]);
       setCoupons([]);
+      setContactRequests([]);
     } finally {
       setDataLoading(false);
     }
@@ -269,6 +276,15 @@ export default function App() {
     }
   };
 
+  const handleUpdateContactRequestStatus = async (id: string, status: ContactRequest['status']) => {
+    try {
+      const updated = await adminApi.updateContactRequestStatus(id, status);
+      setContactRequests(prev => prev.map(request => request.id === id ? updated : request));
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Could not update client request.');
+    }
+  };
+
   // Navigations sidebar configuration
   const navigationTabs: { id: ViewTab; label: string; icon: any }[] = [
     { id: 'Dashboard', label: 'Overview', icon: LayoutGrid },
@@ -279,6 +295,7 @@ export default function App() {
     { id: 'Customers', label: 'Customers', icon: Users },
     { id: 'Inventory', label: 'Inventory', icon: Inbox },
     { id: 'Payments', label: 'Payments', icon: CreditCard },
+    { id: 'Requests', label: 'Requests', icon: MessageSquare },
     { id: 'Settings', label: 'Settings', icon: Settings },
   ];
 
@@ -312,6 +329,7 @@ export default function App() {
     setCustomers([]);
     setTransactions([]);
     setCoupons([]);
+    setContactRequests([]);
     setSettings(defaultSettings);
   };
 
@@ -604,9 +622,17 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'Requests' && (
+              <ClientRequestsView
+                requests={contactRequests}
+                onUpdateStatus={handleUpdateContactRequestStatus}
+              />
+            )}
+
             {activeTab === 'Settings' && (
               <SettingsView
                 settings={settings}
+                products={products}
                 onSaveSettings={handleSaveSettings}
               />
             )}
