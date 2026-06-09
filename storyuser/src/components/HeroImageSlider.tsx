@@ -5,7 +5,11 @@ interface HeroSlide {
   alt: string;
 }
 
-const SLIDES: HeroSlide[] = [
+interface HeroImageSliderProps {
+  images?: string[];
+}
+
+const FALLBACK_SLIDES: HeroSlide[] = [
   {
     src: '/ChatGPT Image Jun 1, 2026, 07_53_36 PM (1).png',
     alt: 'Female model in monochrome editorial tailoring'
@@ -32,16 +36,34 @@ const SLIDES: HeroSlide[] = [
   }
 ];
 
-export function HeroImageSlider() {
+export function HeroImageSlider({ images = [] }: HeroImageSliderProps) {
+  const slides = React.useMemo(() => {
+    const configuredSources = images.map((src) => src.trim());
+
+    return FALLBACK_SLIDES.map((fallback, index) => {
+      const src = configuredSources[index] || fallback.src;
+      return {
+        src,
+        alt: configuredSources[index] ? `STORY editorial hero image ${index + 1}` : fallback.alt
+      };
+    });
+  }, [images]);
+
   const [activeIndex, setActiveIndex] = React.useState(0);
 
   React.useEffect(() => {
+    setActiveIndex((current) => Math.min(current, slides.length - 1));
+  }, [slides.length]);
+
+  React.useEffect(() => {
+    if (slides.length < 2) return;
+
     const timer = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % SLIDES.length);
+      setActiveIndex((current) => (current + 1) % slides.length);
     }, 3600);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [slides.length]);
 
   return (
     <div className="relative mx-auto w-full max-w-[680px] overflow-hidden px-2 pb-9 sm:px-4 lg:pb-10">
@@ -50,7 +72,7 @@ export function HeroImageSlider() {
 
       <div className="relative mx-auto aspect-[4/5] max-h-[560px] w-full max-w-[430px] overflow-hidden bg-[#e8e8e4] p-2 shadow-[0_24px_70px_rgba(0,0,0,0.12)] sm:p-3 lg:max-h-[620px] lg:max-w-[470px]">
         <div className="relative h-full w-full overflow-hidden bg-[#f2f2ef]">
-          {SLIDES.map((slide, index) => (
+          {slides.map((slide, index) => (
             <img
               key={slide.src}
               src={slide.src}
@@ -62,6 +84,7 @@ export function HeroImageSlider() {
                   : 'translate-x-5 scale-[1.025] opacity-0'
               ].join(' ')}
               loading={index === 0 ? 'eager' : 'lazy'}
+              referrerPolicy="no-referrer"
             />
           ))}
           <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-black/5" />
@@ -69,7 +92,7 @@ export function HeroImageSlider() {
       </div>
 
       <div className="absolute bottom-0 left-1/2 flex -translate-x-1/2 items-center justify-center gap-2">
-        {SLIDES.map((slide, index) => (
+        {slides.map((slide, index) => (
           <button
             key={slide.src}
             type="button"

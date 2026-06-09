@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, Info, ShieldCheck, Heart, Sparkles, CreditCard, ChevronRight } from 'lucide-react';
 import { Product, StoreSettings } from '../types';
+import ImageInput from './ImageInput';
 
 interface SettingsViewProps {
   settings: StoreSettings;
@@ -340,13 +341,11 @@ export default function SettingsView({ settings, products, onSaveSettings }: Set
               ['Secondary Hero Image', heroImageSecondary, setHeroImageSecondary],
               ['Detail Hero Image', heroImageDetail, setHeroImageDetail]
             ].map(([label, value, setter]) => (
-              <div key={label as string} className="flex flex-col gap-2">
-                <label className="font-semibold text-neutral-700">{label as string}</label>
-                <input
+              <div key={label as string}>
+                <ImageInput
+                  label={label as string}
                   value={value as string}
-                  onChange={e => (setter as React.Dispatch<React.SetStateAction<string>>)(e.target.value)}
-                  className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono"
-                  placeholder="https://..."
+                  onChange={(url) => (setter as React.Dispatch<React.SetStateAction<string>>)(url)}
                 />
               </div>
             ))}
@@ -374,8 +373,7 @@ export default function SettingsView({ settings, products, onSaveSettings }: Set
               <textarea value={collectionBody} onChange={e => setCollectionBody(e.target.value)} rows={3} className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 resize-none" />
             </div>
             <div className="md:col-span-2 flex flex-col gap-2">
-              <label className="font-semibold text-neutral-700">Collection Image</label>
-              <input value={collectionImage} onChange={e => setCollectionImage(e.target.value)} className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono" />
+              <ImageInput label="Collection Image" value={collectionImage} onChange={setCollectionImage} />
             </div>
           </div>
 

@@ -5,10 +5,11 @@ export const formatINR = (value: number) =>
     maximumFractionDigits: 0
   }).format(value);
 
-export const calculateIndiaOrderTotals = (subtotal: number) => {
-  const shipping = subtotal >= 5000 ? 0 : 149;
-  const tax = subtotal * 0.18;
-  const total = subtotal + shipping + tax;
+export const calculateIndiaOrderTotals = (subtotal: number, couponDiscount: number = 0) => {
+  const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
+  const shipping = discountedSubtotal >= 5000 ? 0 : 149;
+  const tax = discountedSubtotal * 0.18;
+  const total = discountedSubtotal + shipping + tax;
 
   return { shipping, tax, total };
 };

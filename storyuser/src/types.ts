@@ -10,6 +10,7 @@ export interface Product {
   price: number;
   originalPrice?: number;
   category: string;
+  categoryId?: string;
   image: string;
   secondaryImage?: string;
   listImages?: string[];
@@ -21,6 +22,19 @@ export interface Product {
   colors?: ColorOption[];
   stock?: number;
   status?: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  image: string;
+  isActive?: boolean;
+  productCount: number;
+  sortOrder: number;
+  isDynamic?: boolean;
+  parent?: string;
 }
 
 export interface CartItem {
@@ -71,7 +85,25 @@ export interface Order {
   trackingUrl?: string;
 }
 
+export interface CustomerReview {
+  id?: string;
+  name: string;
+  tag: string;
+  rating: number;
+  review: string;
+  status?: string;
+  createdAt?: string;
+}
+
+export type AboutStat = [string, string];
+
+export interface AboutValue {
+  title: string;
+  text: string;
+}
+
 export interface StorefrontContent {
+  announcementItems: string[];
   heroEyebrow: string;
   heroTitle: string;
   heroBody: string;
@@ -80,10 +112,14 @@ export interface StorefrontContent {
   heroImagePrimary: string;
   heroImageSecondary: string;
   heroImageDetail: string;
+  heroImageFourth: string;
+  heroImageFifth: string;
+  heroImageSixth: string;
   heroBadgeEyebrow: string;
   heroBadgeText: string;
   productsEyebrow: string;
   productsTitle: string;
+  productsBody: string;
   homeProductIds: string[];
   collectionEyebrow: string;
   collectionTitle: string;
@@ -100,8 +136,45 @@ export interface StorefrontContent {
   recommendationEyebrow: string;
   recommendationTitle: string;
   recommendationProductIds: string[];
+  storyCategories: StoryCategoryContent[];
+  aboutEyebrow: string;
+  aboutTitle: string;
+  aboutIntroParagraph1: string;
+  aboutIntroParagraph2: string;
+  aboutPrimaryCtaText: string;
+  aboutSecondaryCtaText: string;
+  aboutImage1: string;
+  aboutImage2: string;
+  aboutImage3: string;
+  aboutBadgeText: string;
+  aboutStats: AboutStat[];
+  aboutValuesEyebrow: string;
+  aboutValuesTitle: string;
+  aboutValues: AboutValue[];
+  aboutPromiseEyebrow: string;
+  aboutPromiseTitle: string;
+  aboutPromiseBody: string;
+  aboutPromiseImage: string;
+  razorpayActive: boolean;
+  onlinePaymentEnabled: boolean;
+  codEnabled: boolean;
+  privacyPolicy: string;
+  termsConditions: string;
+  returnRefundPolicy: string;
 }
 
 export type StoryCategoryKey = 'uppers' | 'lowers' | 'dresses' | 'co-ords' | 'footwear' | 'accessories' | 'inners';
 
-export type ActiveScreen = 'shop' | 'about' | 'contact' | 'discover' | 'category' | 'detail' | 'settings' | 'confirmation' | 'login' | 'bag';
+export interface StoryCategoryContent {
+  key: StoryCategoryKey;
+  label?: string;
+  eyebrow?: string;
+  description?: string;
+  cta?: string;
+  categories?: string[];
+  imageFallback?: string;
+  images?: Partial<Record<'men' | 'women' | 'default', string>>;
+  subcategories?: string[];
+}
+
+export type ActiveScreen = 'shop' | 'about' | 'contact' | 'discover' | 'category' | 'detail' | 'settings' | 'confirmation' | 'login' | 'bag' | 'policy';

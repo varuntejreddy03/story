@@ -1,8 +1,9 @@
 import React from 'react';
-import { ActiveScreen, Product, CartItem, UserProfile, Address, Order, ColorOption, StorefrontContent, StoryCategoryKey } from './types';
+import { ActiveScreen, Category, Product, CartItem, UserProfile, Address, Order, ColorOption, StorefrontContent } from './types';
 import { PRODUCTS, INITIAL_USER_PROFILE } from './data';
 import { storyApi } from './api';
 import { Navbar } from './components/Navbar';
+import { AnnouncementTicker } from './components/AnnouncementTicker';
 import { Footer } from './components/Footer';
 import { ShopView } from './components/ShopView';
 import { AboutView } from './components/AboutView';
@@ -15,7 +16,7 @@ import { OrderConfirmationView } from './components/OrderConfirmationView';
 import { CartDrawer } from './components/CartDrawer';
 import { LoginView } from './components/LoginView';
 import { BagView } from './components/BagView';
-import { LEGACY_CATEGORY_ALIASES, STORY_CATEGORIES } from './categoryConfig';
+import { PolicyKey, PolicyView } from './components/PolicyView';
 
 declare global {
   interface Window {
@@ -27,6 +28,8 @@ interface RazorpayPaymentResponse {
   razorpay_payment_id: string;
   razorpay_signature: string;
 }
+
+type CheckoutPaymentMethod = 'online' | 'cod';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -65,18 +68,30 @@ const loadRazorpay = () => new Promise<boolean>((resolve) => {
 });
 
 const DEFAULT_STOREFRONT_CONTENT: StorefrontContent = {
+  announcementItems: [
+    'FREE SHIPPING ON ORDERS ABOVE INR 999',
+    'SALE 20% OFF',
+    '100% AUTHENTIC BRANDED FASHION',
+    'NEW ARRIVALS EVERY WEEK',
+    'EASY RETURNS & EXCHANGES',
+    'CURATED IN INDIA FOR YOU'
+  ],
   heroEyebrow: 'NEW EDITORIAL CAPSULE',
   heroTitle: 'OUR LATEST STORY',
   heroBody: 'Discover verified branded fashion, curated in India for everyday premium style.',
-  heroPrimaryCta: 'SHOP THE DROP',
-  heroSecondaryCta: 'EXPLORE STYLE EDIT',
+  heroPrimaryCta: 'EXPLORE COLLECTION',
+  heroSecondaryCta: 'VIEW STYLE DIARY',
   heroImagePrimary: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85',
   heroImageSecondary: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
   heroImageDetail: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=700&q=85',
+  heroImageFourth: '',
+  heroImageFifth: '',
+  heroImageSixth: '',
   heroBadgeEyebrow: 'Story India 2026',
   heroBadgeText: 'Tailored quiet luxury',
   productsEyebrow: 'Seasonal selection',
   productsTitle: 'Our Products',
+  productsBody: 'Explore curated essentials across clothing, footwear, and everyday luxury.',
   homeProductIds: [],
   collectionEyebrow: 'Curated combinations',
   collectionTitle: 'Perfect Match',
@@ -92,34 +107,76 @@ const DEFAULT_STOREFRONT_CONTENT: StorefrontContent = {
   jewelryBody: 'Adorn yourself with timeless accessories that complete every look.',
   recommendationEyebrow: 'Selected next',
   recommendationTitle: 'Recommendation',
-  recommendationProductIds: ['linen-wide-pants', 'faux-leather-jacket', 'gray-tube-top', 'drawstring-linen-pants', 'convertible-crossbody-bag']
+  recommendationProductIds: ['linen-wide-pants', 'faux-leather-jacket', 'gray-tube-top', 'drawstring-linen-pants', 'convertible-crossbody-bag'],
+  storyCategories: [],
+  aboutEyebrow: 'About STORY India',
+  aboutTitle: 'Verified Fashion, Curated In India',
+  aboutIntroParagraph1: 'STORY is a premium India-based fashion store built for people who want original branded pieces without the noise of fast, careless shopping.',
+  aboutIntroParagraph2: 'We curate verified branded fashion across uppers, lowers, dresses, co-ords, footwear, accessories, and inners, with a focus on authenticity, condition, price, and everyday Indian style.',
+  aboutPrimaryCtaText: 'Shop Verified Picks',
+  aboutSecondaryCtaText: 'View Curated Drops',
+  aboutImage1: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1200&q=85',
+  aboutImage2: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
+  aboutImage3: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85',
+  aboutBadgeText: 'Premium branded fashion, checked, styled, and priced for modern Indian wardrobes.',
+  aboutStats: [['2026', 'Founded'], ['7', 'Core categories'], ['100%', 'Original focus'], ['INDIA', 'Curated for']],
+  aboutValuesEyebrow: 'Our standard',
+  aboutValuesTitle: 'Original Pieces, Clear Checks',
+  aboutValues: [
+    {
+      title: 'Authentic',
+      text: 'Every piece is checked for brand identity, condition, finish, and everyday wearability before it enters the STORY edit.'
+    },
+    {
+      title: 'Curated',
+      text: 'We select branded fashion for Indian wardrobes: sharp layers, premium basics, clean footwear, and easy occasion pieces.'
+    },
+    {
+      title: 'Value',
+      text: 'The goal is simple: original branded fashion, better prices, and quality that feels worth returning to.'
+    }
+  ],
+  aboutPromiseEyebrow: 'The STORY promise',
+  aboutPromiseTitle: 'Verified Authentic. Best Price. Better Quality.',
+  aboutPromiseBody: 'From first scroll to final delivery, STORY keeps the edit focused: real branded pieces, clean product presentation, reliable support, and fashion that fits Indian everyday life.',
+  aboutPromiseImage: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1000&q=85',
+  razorpayActive: true,
+  onlinePaymentEnabled: true,
+  codEnabled: false,
+  privacyPolicy: 'We respect your privacy and use customer information only to process orders, provide support, improve the shopping experience, and meet legal or payment requirements. We do not sell customer data. Payment information is processed securely by our payment partners.',
+  termsConditions: 'By using STORY India, you agree to provide accurate account, delivery, and payment information. Product availability, pricing, promotions, and delivery timelines may change without prior notice. Orders are confirmed only after successful payment and verification.',
+  returnRefundPolicy: 'Returns or exchanges may be requested for eligible unused products within the return window shown at purchase. Items must be returned with tags, packaging, and invoice. Refunds are processed to the original payment method after quality check approval.'
 };
 
-const STORY_CATEGORY_KEYS = STORY_CATEGORIES.map((category) => category.key);
-
-const parseRoute = (): { screen: ActiveScreen; category: StoryCategoryKey } => {
+const parseRoute = (): { screen: ActiveScreen; categorySlug: string; policyKey: PolicyKey } => {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   const categoryMatch = path.match(/^\/category\/([^/]+)$/);
-  const rawCategory = categoryMatch?.[1];
-  const category = rawCategory
-    ? (LEGACY_CATEGORY_ALIASES[rawCategory] || rawCategory) as StoryCategoryKey
-    : undefined;
 
-  if (category && STORY_CATEGORY_KEYS.includes(category)) {
-    return { screen: 'category', category };
+  if (categoryMatch?.[1]) {
+    return { screen: 'category', categorySlug: decodeURIComponent(categoryMatch[1]), policyKey: 'privacy' };
   }
 
-  if (path === '/collections') return { screen: 'discover', category: 'uppers' };
-  if (path === '/about') return { screen: 'about', category: 'uppers' };
-  if (path === '/contact') return { screen: 'contact', category: 'uppers' };
-  if (path === '/account') return { screen: 'settings', category: 'uppers' };
-  if (path === '/bag') return { screen: 'bag', category: 'uppers' };
+  if (path === '/privacy-policy') return { screen: 'policy', categorySlug: '', policyKey: 'privacy' };
+  if (path === '/terms-conditions') return { screen: 'policy', categorySlug: '', policyKey: 'terms' };
+  if (path === '/return-refund-policy') return { screen: 'policy', categorySlug: '', policyKey: 'returns' };
+  if (path === '/collections') return { screen: 'discover', categorySlug: '', policyKey: 'privacy' };
+  if (path === '/about') return { screen: 'about', categorySlug: '', policyKey: 'privacy' };
+  if (path === '/contact') return { screen: 'contact', categorySlug: '', policyKey: 'privacy' };
+  if (path === '/account') return { screen: 'settings', categorySlug: '', policyKey: 'privacy' };
+  if (path === '/bag') return { screen: 'bag', categorySlug: '', policyKey: 'privacy' };
 
-  return { screen: 'shop', category: 'uppers' };
+  return { screen: 'shop', categorySlug: '', policyKey: 'privacy' };
 };
 
-const screenPath = (screen: ActiveScreen, category: StoryCategoryKey) => {
-  if (screen === 'category') return `/category/${category}`;
+const policyPath = (policyKey: PolicyKey) => {
+  if (policyKey === 'terms') return '/terms-conditions';
+  if (policyKey === 'returns') return '/return-refund-policy';
+  return '/privacy-policy';
+};
+
+const screenPath = (screen: ActiveScreen, categorySlug: string, policyKey: PolicyKey) => {
+  if (screen === 'category') return `/category/${categorySlug}`;
+  if (screen === 'policy') return policyPath(policyKey);
   if (screen === 'discover') return '/collections';
   if (screen === 'about') return '/about';
   if (screen === 'contact') return '/contact';
@@ -132,8 +189,10 @@ export default function App() {
   const initialRoute = React.useMemo(() => parseRoute(), []);
   const [activeScreen, setActiveScreen] = React.useState<ActiveScreen>(initialRoute.screen);
   const [activeProduct, setActiveProduct] = React.useState<Product | null>(null);
-  const [activeStoryCategory, setActiveStoryCategory] = React.useState<StoryCategoryKey>(initialRoute.category);
+  const [activeCategorySlug, setActiveCategorySlug] = React.useState(initialRoute.categorySlug);
+  const [activePolicyKey, setActivePolicyKey] = React.useState<PolicyKey>(initialRoute.policyKey);
   const [products, setProducts] = React.useState<Product[]>(PRODUCTS);
+  const [categories, setCategories] = React.useState<Category[]>([]);
   const [storefrontContent, setStorefrontContent] = React.useState<StorefrontContent>(DEFAULT_STOREFRONT_CONTENT);
   const [orders, setOrders] = React.useState<Order[]>([]);
   const [apiNotice, setApiNotice] = React.useState('');
@@ -141,13 +200,18 @@ export default function App() {
 
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
   const [checkoutBusy, setCheckoutBusy] = React.useState(false);
+  const [checkoutMessage, setCheckoutMessage] = React.useState('');
+  const [checkoutError, setCheckoutError] = React.useState('');
   const [cartItems, setCartItems] = React.useState<CartItem[]>([]);
   const [userProfile, setUserProfile] = React.useState<UserProfile>(INITIAL_USER_PROFILE);
   const [addresses, setAddresses] = React.useState<Address[]>([]);
+  const [checkoutAddressId, setCheckoutAddressId] = React.useState('');
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = React.useState<CheckoutPaymentMethod>('online');
   const [compiledOrder, setCompiledOrder] = React.useState<Order | null>(null);
 
   const [cartOpen, setCartOpen] = React.useState(false);
   const [authIntent, setAuthIntent] = React.useState<'account' | 'checkout'>('account');
+  const [accountInitialTab, setAccountInitialTab] = React.useState<'profile' | 'orders' | 'wishlist' | 'settings'>('profile');
 
   const loadAccountData = React.useCallback(async () => {
     const [cartResult, addressesResult, ordersResult] = await Promise.allSettled([
@@ -184,6 +248,12 @@ export default function App() {
       })
       .catch(() => undefined);
 
+    storyApi.categories()
+      .then((apiCategories) => {
+        if (mounted) setCategories(apiCategories);
+      })
+      .catch(() => undefined);
+
     return () => {
       mounted = false;
     };
@@ -216,9 +286,31 @@ export default function App() {
   }, [activeScreen, activeProduct]);
 
   React.useEffect(() => {
+    if (addresses.length === 0) {
+      setCheckoutAddressId('');
+      return;
+    }
+
+    if (checkoutAddressId && addresses.some((address) => address.id === checkoutAddressId)) return;
+    const preferredAddress = addresses.find((address) => address.isDefault) || addresses[0];
+    setCheckoutAddressId(preferredAddress.id || '');
+  }, [addresses, checkoutAddressId]);
+
+  React.useEffect(() => {
+    const onlineAvailable = storefrontContent.onlinePaymentEnabled && storefrontContent.razorpayActive;
+    if (checkoutPaymentMethod === 'online' && !onlineAvailable && storefrontContent.codEnabled) {
+      setCheckoutPaymentMethod('cod');
+    }
+    if (checkoutPaymentMethod === 'cod' && !storefrontContent.codEnabled && onlineAvailable) {
+      setCheckoutPaymentMethod('online');
+    }
+  }, [checkoutPaymentMethod, storefrontContent.codEnabled, storefrontContent.onlinePaymentEnabled, storefrontContent.razorpayActive]);
+
+  React.useEffect(() => {
     const handlePopState = () => {
       const route = parseRoute();
-      setActiveStoryCategory(route.category);
+      setActiveCategorySlug(route.categorySlug);
+      setActivePolicyKey(route.policyKey);
       setActiveProduct(null);
       setActiveScreen(route.screen);
     };
@@ -227,16 +319,17 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigateTo = React.useCallback((screen: ActiveScreen, category = activeStoryCategory) => {
-    setActiveStoryCategory(category);
+  const navigateTo = React.useCallback((screen: ActiveScreen, categorySlug = activeCategorySlug, policyKey = activePolicyKey) => {
+    setActiveCategorySlug(categorySlug);
+    setActivePolicyKey(policyKey);
     setActiveProduct(null);
     setActiveScreen(screen);
 
-    const nextPath = screenPath(screen, category);
+    const nextPath = screenPath(screen, categorySlug, policyKey);
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, '', nextPath);
     }
-  }, [activeStoryCategory]);
+  }, [activeCategorySlug, activePolicyKey]);
 
   const cartBadgeCount = React.useMemo(
     () => cartItems.reduce((acc, curr) => acc + curr.quantity, 0),
@@ -315,45 +408,96 @@ export default function App() {
     setActiveScreen('detail');
   };
 
-  const handleOpenStoryCategory = (category: StoryCategoryKey) => {
-    navigateTo('category', category);
+  const handleOpenCategory = (categorySlug: string) => {
+    navigateTo('category', categorySlug);
+  };
+
+  const handleOpenPolicy = (policyKey: PolicyKey) => {
+    navigateTo('policy', '', policyKey);
   };
 
   const ensureCheckoutAddress = async () => {
-    const existingAddress = addresses.find(address => address.id) || addresses[0];
-    if (existingAddress?.id) return existingAddress.id;
-
-    const createdAddress = await storyApi.createAddress(existingAddress || {
-      fullName: `${userProfile.firstName} ${userProfile.lastName}`.trim() || 'STORY Client',
-      street: '12 Kala Ghoda Lane',
-      city: 'Mumbai, Maharashtra 400001',
-      country: 'India'
-    }, userProfile);
-
-    setAddresses([createdAddress, ...addresses.filter(address => address.street !== createdAddress.street)]);
-    return createdAddress.id as string;
+    const selectedAddress = addresses.find(address => address.id === checkoutAddressId) || addresses.find(address => address.isDefault) || addresses[0];
+    if (selectedAddress?.id) return selectedAddress.id;
+    throw new Error('Add a delivery address before checkout.');
   };
 
-  const compileAndSubmitOrder = async () => {
+  const handleSaveCheckoutAddress = async (address: Address) => {
+    const saved = address.id
+      ? await storyApi.updateAddress({ ...address, isDefault: true }, userProfile)
+      : await storyApi.createAddress({ ...address, isDefault: true }, userProfile);
+
+    setAddresses(prev => {
+      const next = prev.filter(item => item.id !== saved.id).map(item => ({ ...item, isDefault: false }));
+      return [{ ...saved, isDefault: true }, ...next];
+    });
+    setCheckoutAddressId(saved.id || '');
+    return saved;
+  };
+
+  const handleCompleteAuthPhone = async (phone: string, profile: Partial<UserProfile>) => {
+    const nextProfile: UserProfile = {
+      firstName: profile.firstName || userProfile.firstName || 'Story',
+      lastName: profile.lastName || userProfile.lastName || 'Client',
+      email: profile.email || userProfile.email,
+      phone,
+      language: profile.language || userProfile.language || 'ENGLISH',
+      newsletter: profile.newsletter ?? userProfile.newsletter ?? true
+    };
+    const saved = await storyApi.updateProfile(nextProfile);
+    return saved;
+  };
+
+  const compileAndSubmitOrder = async (couponCode?: string) => {
     if (cartItems.length === 0 || checkoutBusy) return;
 
     if (!isLoggedIn) {
+      setCheckoutError('');
       setAuthIntent('checkout');
       setActiveScreen('login');
       return;
     }
 
     setCheckoutBusy(true);
+    setCheckoutMessage('Checking delivery details');
+    setCheckoutError('');
     setApiNotice('');
 
     try {
+      setCheckoutMessage('Confirming delivery address');
       const addressId = await ensureCheckoutAddress();
-      const checkout = await storyApi.createOrder(addressId);
+      const onlineAvailable = storefrontContent.onlinePaymentEnabled && storefrontContent.razorpayActive;
+      if (checkoutPaymentMethod === 'online' && !onlineAvailable) throw new Error('Online payment is currently unavailable.');
+      if (checkoutPaymentMethod === 'cod' && !storefrontContent.codEnabled) throw new Error('Pay on delivery is currently unavailable.');
+
+      setCheckoutMessage(checkoutPaymentMethod === 'cod' ? 'Placing pay-on-delivery order' : 'Creating secure payment order');
+      const checkout = await storyApi.createOrder(addressId, couponCode, checkoutPaymentMethod);
+
+      if (checkoutPaymentMethod === 'cod' || !checkout.requiresOnlinePayment) {
+        setCompiledOrder(checkout.order);
+        setCartItems([]);
+        setCartOpen(false);
+        setCheckoutBusy(false);
+        setCheckoutMessage('');
+        setCheckoutError('');
+        setActiveScreen('confirmation');
+        storyApi.getOrders().then(setOrders).catch(() => undefined);
+        return;
+      }
+
+      setCheckoutMessage('Loading Razorpay checkout');
       const razorpayLoaded = await loadRazorpay();
 
       if (!razorpayLoaded || !window.Razorpay) {
         throw new Error('Razorpay checkout could not be loaded.');
       }
+
+      if (!checkout.keyId) {
+        throw new Error('Razorpay is not configured for this store.');
+      }
+
+      let paymentFinished = false;
+      setCheckoutMessage('Complete payment in the Razorpay window');
 
       const razorpay = new window.Razorpay({
         key: checkout.keyId,
@@ -369,27 +513,48 @@ export default function App() {
         },
         theme: { color: '#111111' },
         handler: async (response: RazorpayPaymentResponse) => {
-          const verifiedOrder = await storyApi.verifyPayment({
-            orderId: checkout.publicId || checkout.orderId,
-            razorpayPaymentId: response.razorpay_payment_id,
-            razorpaySignature: response.razorpay_signature
-          });
+          paymentFinished = true;
+          setCheckoutMessage('Verifying payment');
+          try {
+            const verifiedOrder = await storyApi.verifyPayment({
+              orderId: checkout.publicId || checkout.orderId,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature
+            });
 
-          setCompiledOrder(verifiedOrder);
-          setCartItems([]);
-          setCartOpen(false);
-          setCheckoutBusy(false);
-          setActiveScreen('confirmation');
-          storyApi.getOrders().then(setOrders).catch(() => undefined);
+            setCompiledOrder(verifiedOrder);
+            setCartItems([]);
+            setCartOpen(false);
+            setCheckoutBusy(false);
+            setCheckoutMessage('');
+            setCheckoutError('');
+            setActiveScreen('confirmation');
+            storyApi.getOrders().then(setOrders).catch(() => undefined);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Payment verification failed.';
+            setCheckoutError(message);
+            setApiNotice(message);
+            setCheckoutMessage('');
+            setCheckoutBusy(false);
+          }
         },
         modal: {
-          ondismiss: () => setCheckoutBusy(false)
+          ondismiss: () => {
+            if (!paymentFinished) {
+              setCheckoutBusy(false);
+              setCheckoutMessage('');
+              setCheckoutError('Payment window closed. Your bag is still saved.');
+            }
+          }
         }
       });
 
       razorpay.open();
     } catch (error) {
-      setApiNotice(error instanceof Error ? error.message : 'Checkout could not be started.');
+      const message = error instanceof Error ? error.message : 'Checkout could not be started.';
+      setApiNotice(message);
+      setCheckoutError(message);
+      setCheckoutMessage('');
       setCheckoutBusy(false);
     }
   };
@@ -400,9 +565,10 @@ export default function App() {
     setActiveScreen('bag');
   };
 
-  const handleFinalCheckout = () => {
+  const handleFinalCheckout = (couponCode?: string) => {
     if (cartItems.length === 0) return;
-    compileAndSubmitOrder();
+    setCheckoutError('');
+    compileAndSubmitOrder(couponCode);
   };
 
   const handleProfileSave = async (nextProfile: UserProfile) => {
@@ -431,31 +597,36 @@ export default function App() {
       <Navbar
         activeScreen={activeScreen}
         setActiveScreen={(scr) => {
+          if (scr === 'settings') setAccountInitialTab('profile');
           navigateTo(scr);
         }}
         cartCount={cartBadgeCount}
         onCartToggle={() => setCartOpen(prev => !prev)}
       />
+      <AnnouncementTicker items={storefrontContent.announcementItems} />
 
       {apiNotice && (
         <div className="border-b border-[#deded9] bg-white px-4 py-2 text-center font-mono text-[9px] uppercase tracking-widest text-[#555555]">
           {apiNotice}
         </div>
       )}
-
       <main className="flex-grow">
         {activeScreen === 'shop' && (
           <ShopView
             products={products}
+            categories={categories}
             content={storefrontContent}
             onSelectProduct={handleSelectProduct}
-            onOpenCategory={handleOpenStoryCategory}
+            onOpenCategory={handleOpenCategory}
             setActiveScreen={(screen) => navigateTo(screen as ActiveScreen)}
           />
         )}
 
         {activeScreen === 'about' && (
-          <AboutView setActiveScreen={(screen) => setActiveScreen(screen)} />
+          <AboutView
+            content={storefrontContent}
+            setActiveScreen={(screen) => navigateTo(screen)}
+          />
         )}
 
         {activeScreen === 'contact' && (
@@ -465,19 +636,22 @@ export default function App() {
           />
         )}
 
-        {activeScreen === 'discover' && (
-          <DiscoverView
-            products={products}
-            content={storefrontContent}
-            onSelectProduct={handleSelectProduct}
-          />
-        )}
+          {activeScreen === 'discover' && (
+            <DiscoverView
+              products={products}
+              categories={categories}
+              content={storefrontContent}
+              onSelectProduct={handleSelectProduct}
+            />
+          )}
 
         {activeScreen === 'category' && (
           <CategoryGenderView
-            categoryKey={activeStoryCategory}
+            categorySlug={activeCategorySlug}
+            categories={categories}
             products={products}
             onBack={() => navigateTo('shop')}
+            onOpenCategory={handleOpenCategory}
             onSelectProduct={handleSelectProduct}
           />
         )}
@@ -501,6 +675,7 @@ export default function App() {
               setAddresses={setAddresses}
               orders={orders}
               onSignOut={handleSignOut}
+              initialTab={accountInitialTab}
             />
           ) : (
             <LoginView
@@ -511,6 +686,7 @@ export default function App() {
               onSignUp={(payload) => storyApi.register(payload)}
               onForgotPassword={(email) => storyApi.forgotPassword(email)}
               googleClientId={googleClientId}
+              onCompletePhone={handleCompleteAuthPhone}
               onLoginSuccess={(newProfile, token) => handleAuthenticated(newProfile, token, 'settings')}
             />
           )
@@ -525,6 +701,7 @@ export default function App() {
             onSignUp={(payload) => storyApi.register(payload)}
             onForgotPassword={(email) => storyApi.forgotPassword(email)}
             googleClientId={googleClientId}
+            onCompletePhone={handleCompleteAuthPhone}
             onLoginSuccess={(newProfile, token) => handleAuthenticated(newProfile, token, authIntent === 'checkout' ? 'bag' : 'settings')}
           />
         )}
@@ -536,7 +713,10 @@ export default function App() {
               setCompiledOrder(null);
               setActiveScreen('shop');
             }}
-            onViewOrders={() => setActiveScreen('settings')}
+            onViewOrders={() => {
+              setAccountInitialTab('orders');
+              setActiveScreen('settings');
+            }}
           />
         )}
 
@@ -547,12 +727,33 @@ export default function App() {
             onRemoveItem={handleRemoveItem}
             onCheckout={handleFinalCheckout}
             addresses={addresses}
+            selectedAddressId={checkoutAddressId}
+            onSelectAddress={setCheckoutAddressId}
+            onSaveAddress={handleSaveCheckoutAddress}
+            paymentMethod={checkoutPaymentMethod}
+            onPaymentMethodChange={setCheckoutPaymentMethod}
+            onlinePaymentEnabled={storefrontContent.onlinePaymentEnabled && storefrontContent.razorpayActive}
+            codEnabled={storefrontContent.codEnabled}
             isLoggedIn={isLoggedIn}
             isCheckingOut={checkoutBusy}
+            checkoutMessage={checkoutMessage}
+            checkoutError={checkoutError}
+            onValidateCoupon={async (code) => {
+              const subtotal = cartItems.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+              return storyApi.validateCoupon(code, subtotal);
+            }}
             onLoginRedirect={() => {
               setAuthIntent('checkout');
               setActiveScreen('login');
             }}
+          />
+        )}
+
+        {activeScreen === 'policy' && (
+          <PolicyView
+            policyKey={activePolicyKey}
+            content={storefrontContent}
+            onBack={() => navigateTo('shop')}
           />
         )}
       </main>
@@ -568,8 +769,10 @@ export default function App() {
 
       <Footer
         setActiveScreen={(scr) => {
+          if (scr === 'settings') setAccountInitialTab('profile');
           navigateTo(scr);
         }}
+        onOpenPolicy={handleOpenPolicy}
       />
     </div>
   );

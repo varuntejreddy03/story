@@ -8,7 +8,15 @@ import { env } from '../../config/env.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { serializeUser } from '../../utils/serializers.js';
-import { clearAuthCookie, requireAuth, setAuthCookie, signToken } from '../../middleware/auth.js';
+import {
+  clearAdminAuthCookie,
+  clearAuthCookie,
+  requireAdminAuth,
+  requireAuth,
+  setAdminAuthCookie,
+  setAuthCookie,
+  signToken
+} from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { sendEmail } from '../../utils/sendEmail.js';
 
@@ -19,7 +27,7 @@ const registerSchema = z.object({
     firstName: z.string().min(1),
     lastName: z.string().optional().default(''),
     email: z.string().email(),
-    phone: z.string().optional().default(''),
+    phone: z.string().min(6),
     password: z.string().min(6)
   })
 });
@@ -57,6 +65,12 @@ const issueSession = (res, user) => {
   return token;
 };
 
+const issueAdminSession = (res, user) => {
+  const token = signToken(user);
+  setAdminAuthCookie(res, token);
+  return token;
+};
+
 authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, res) => {
   const { firstName, lastName, email, phone, password } = req.validated.body;
   const passwordHash = await bcrypt.hash(password, 12);
@@ -67,20 +81,7 @@ authRouter.post('/register', validate(registerSchema), asyncHandler(async (req, 
       lastName,
       email: email.toLowerCase(),
       phone,
-      passwordHash,
-      addresses: {
-        create: {
-          label: 'Home',
-          name: `${firstName} ${lastName}`.trim(),
-          phone: phone || '+91 98765 43210',
-          line1: '12 Kala Ghoda Lane',
-          city: 'Mumbai',
-          state: 'Maharashtra',
-          pincode: '400001',
-          country: 'India',
-          isDefault: true
-        }
-      }
+      passwordHash
     }
   });
 
@@ -99,6 +100,30 @@ authRouter.post('/login', validate(loginSchema), asyncHandler(async (req, res) =
 
   const token = issueSession(res, user);
   res.json({ success: true, data: { user: serializeUser(user), token } });
+}));
+
+authRouter.post('/admin/login', validate(loginSchema), asyncHandler(async (req, res) => {
+  const { email, password } = req.validated.body;
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  if (!user || !user.passwordHash) throw new ApiError(401, 'Invalid email or password');
+  if (!user.isActive) throw new ApiError(403, 'Account is disabled');
+  if (user.role !== 'admin') throw new ApiError(403, 'This account does not have admin access.');
+
+  const isValid = await bcrypt.compare(password, user.passwordHash);
+  if (!isValid) throw new ApiError(401, 'Invalid email or password');
+
+  const token = issueAdminSession(res, user);
+  res.json({ success: true, data: { user: serializeUser(user), token } });
+}));
+
+authRouter.post('/admin/logout', asyncHandler(async (_req, res) => {
+  clearAdminAuthCookie(res);
+  res.json({ success: true, data: { loggedOut: true } });
+}));
+
+authRouter.get('/admin/me', requireAdminAuth, asyncHandler(async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+  res.json({ success: true, data: { user: serializeUser(user) } });
 }));
 
 authRouter.get('/google/config', asyncHandler(async (_req, res) => {

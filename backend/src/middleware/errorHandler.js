@@ -18,6 +18,9 @@ export const errorHandler = (error, _req, res, _next) => {
     } else if (error.code === 'P2025') {
       statusCode = 404;
       message = 'Record not found';
+    } else if (['P1001', 'P1002', 'P1017'].includes(error.code)) {
+      statusCode = 503;
+      message = 'Database is temporarily unavailable. Please retry in a moment.';
     }
   }
 

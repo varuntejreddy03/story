@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../config/db.js';
 import { razorpay } from '../../config/razorpay.js';
 import { env } from '../../config/env.js';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAdminAuth, requireAuth } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiError } from '../../utils/ApiError.js';
@@ -16,7 +16,8 @@ export const adminOrdersRouter = express.Router();
 
 const orderInclude = {
   items: true,
-  user: true
+  user: true,
+  transactions: true
 };
 
 const generatePublicId = () => `ST-IN-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -24,6 +25,12 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const orderIdentityFilter = (id) => (uuidPattern.test(id)
   ? { OR: [{ id }, { publicId: id }] }
   : { publicId: id });
+const settingsToObject = (settings) => Object.fromEntries(settings.map((setting) => [setting.key, setting.value]));
+const settingEnabled = (settings, key, fallback = false) => {
+  const value = settings[key];
+  if (value === undefined || value === null || value === '') return fallback;
+  return String(value).toLowerCase() === 'true';
+};
 
 const validateCoupon = async (couponCode, subtotal) => {
   if (!couponCode) return null;
@@ -42,12 +49,11 @@ ordersRouter.use(requireAuth);
 ordersRouter.post('/', validate(z.object({
   body: z.object({
     addressId: z.string().uuid(),
+    paymentMethod: z.enum(['online', 'cod']).optional().default('online'),
     couponCode: z.string().optional(),
     notes: z.string().optional()
   })
 })), asyncHandler(async (req, res) => {
-  if (!razorpay) throw new ApiError(500, 'Razorpay is not configured');
-
   const cartItems = await prisma.cartItem.findMany({
     where: { userId: req.user.id },
     include: { product: true }
@@ -65,19 +71,30 @@ ordersRouter.post('/', validate(z.object({
   if (!address) throw new ApiError(404, 'Address not found');
 
   const settings = await prisma.setting.findMany();
+  const settingsObject = settingsToObject(settings);
+  const onlinePaymentEnabled = settingEnabled(settingsObject, 'online_payment_enabled', true) && settingEnabled(settingsObject, 'razorpay_active', true);
+  const codEnabled = settingEnabled(settingsObject, 'cod_enabled', false);
+  const paymentMethod = req.validated.body.paymentMethod;
+
+  if (paymentMethod === 'online' && !onlinePaymentEnabled) throw new ApiError(400, 'Online payment is currently disabled');
+  if (paymentMethod === 'cod' && !codEnabled) throw new ApiError(400, 'Pay on delivery is currently disabled');
+  if (paymentMethod === 'online' && !razorpay) throw new ApiError(500, 'Razorpay is not configured');
+
   const subtotalPreview = cartItems.reduce((sum, item) => sum + toNumber(item.product.discountedPrice || item.product.price) * item.quantity, 0);
   const coupon = await validateCoupon(req.validated.body.couponCode, subtotalPreview);
   const totals = calculateOrderTotals({ items: cartItems, coupon, settings });
   const publicId = generatePublicId();
-  const razorpayOrder = await razorpay.orders.create({
-    amount: paise(totals.total),
-    currency: 'INR',
-    receipt: publicId,
-    notes: {
-      publicId,
-      userId: req.user.id
-    }
-  });
+  const razorpayOrder = paymentMethod === 'online'
+    ? await razorpay.orders.create({
+        amount: paise(totals.total),
+        currency: 'INR',
+        receipt: publicId,
+        notes: {
+          publicId,
+          userId: req.user.id
+        }
+      })
+    : null;
 
   const addressSnapshot = {
     id: address.id,
@@ -102,7 +119,9 @@ ordersRouter.post('/', validate(z.object({
         gstPercentage: totals.gstPercentage,
         gstAmount: totals.gstAmount,
         total: totals.total,
-        razorpayOrderId: razorpayOrder.id,
+        paymentStatus: 'pending',
+        status: paymentMethod === 'cod' ? 'confirmed' : 'pending',
+        razorpayOrderId: razorpayOrder?.id,
         notes: req.validated.body.notes,
         items: {
           create: cartItems.map((item) => ({
@@ -120,6 +139,34 @@ ordersRouter.post('/', validate(z.object({
       },
       include: orderInclude
     });
+
+    if (paymentMethod === 'cod') {
+      for (const item of cartItems) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } }
+        });
+      }
+
+      if (coupon?.id) {
+        await tx.coupon.update({
+          where: { id: coupon.id },
+          data: { usedCount: { increment: 1 } }
+        });
+      }
+
+      await tx.cartItem.deleteMany({ where: { userId: req.user.id } });
+      await tx.paymentTransaction.create({
+        data: {
+          orderId: created.id,
+          amount: totals.total,
+          currency: 'INR',
+          method: 'Pay on delivery',
+          status: 'Pending'
+        }
+      });
+    }
+
     return created;
   });
 
@@ -129,10 +176,12 @@ ordersRouter.post('/', validate(z.object({
       order: serializeOrder(order),
       orderId: order.id,
       publicId: order.publicId,
-      razorpayOrderId: razorpayOrder.id,
-      amount: razorpayOrder.amount,
-      currency: razorpayOrder.currency,
-      keyId: env.razorpayKeyId
+      paymentMethod,
+      requiresOnlinePayment: paymentMethod === 'online',
+      razorpayOrderId: razorpayOrder?.id || '',
+      amount: razorpayOrder?.amount || paise(totals.total),
+      currency: razorpayOrder?.currency || 'INR',
+      keyId: paymentMethod === 'online' ? env.razorpayKeyId : ''
     }
   });
 }));
@@ -184,7 +233,7 @@ ordersRouter.post('/:id/cancel', asyncHandler(async (req, res) => {
   if (!['pending', 'confirmed'].includes(order.status)) throw new ApiError(400, 'Order can no longer be cancelled');
 
   const updated = await prisma.$transaction(async (tx) => {
-    if (order.paymentStatus === 'paid') {
+    if (order.paymentStatus === 'paid' || !order.razorpayOrderId) {
       for (const item of order.items) {
         if (item.productId) {
           await tx.product.update({
@@ -203,7 +252,7 @@ ordersRouter.post('/:id/cancel', asyncHandler(async (req, res) => {
   res.json({ success: true, data: serializeOrder(updated) });
 }));
 
-adminOrdersRouter.use(requireAuth, requireAdmin);
+adminOrdersRouter.use(requireAdminAuth);
 
 adminOrdersRouter.get('/', asyncHandler(async (req, res) => {
   const { status, paymentStatus, search } = req.query;
@@ -226,8 +275,10 @@ adminOrdersRouter.get('/', asyncHandler(async (req, res) => {
     success: true,
     data: orders.map((order) => ({
       ...serializeOrder(order),
-      customerName: `${order.user.firstName}${order.user.lastName ? ` ${order.user.lastName}` : ''}`,
-      customerEmail: order.user.email,
+      customerName: order.user
+        ? `${order.user.firstName}${order.user.lastName ? ` ${order.user.lastName}` : ''}`
+        : order.addressSnapshot?.fullName || order.addressSnapshot?.name || 'STORY Client',
+      customerEmail: order.user?.email || '',
       amount: toNumber(order.total),
       paymentStatus: order.paymentStatus,
       fulfillmentStatus: order.status
@@ -248,14 +299,19 @@ adminOrdersRouter.patch('/:id/status', validate(z.object({
   params: z.object({ id: z.string() }),
   body: z.object({
     status: z.enum(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']).optional(),
-    paymentStatus: z.enum(['pending', 'paid', 'failed', 'refunded']).optional()
+    paymentStatus: z.enum(['pending', 'paid', 'failed', 'refunded']).optional(),
+    trackingUrl: z.string().trim().url().or(z.literal('')).optional()
   })
 })), asyncHandler(async (req, res) => {
   const existing = await prisma.order.findFirst({ where: orderIdentityFilter(req.validated.params.id) });
   if (!existing) throw new ApiError(404, 'Order not found');
+  const data = {
+    ...req.validated.body,
+    ...(req.validated.body.trackingUrl === '' ? { trackingUrl: null } : {})
+  };
   const order = await prisma.order.update({
     where: { id: existing.id },
-    data: req.validated.body,
+    data,
     include: orderInclude
   });
   res.json({ success: true, data: serializeOrder(order) });

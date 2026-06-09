@@ -332,6 +332,14 @@ export const initialCoupons: Coupon[] = [
 ];
 
 export const defaultSettings: StoreSettings = {
+  announcementItems: [
+    'FREE SHIPPING ON ORDERS ABOVE INR 999',
+    'SALE 20% OFF',
+    '100% AUTHENTIC BRANDED FASHION',
+    'NEW ARRIVALS EVERY WEEK',
+    'EASY RETURNS & EXCHANGES',
+    'CURATED IN INDIA FOR YOU'
+  ],
   storeName: 'STORY India',
   currency: 'INR',
   contactEmail: 'care@story.in',
@@ -339,6 +347,8 @@ export const defaultSettings: StoreSettings = {
   freeDeliveryThreshold: 5000,
   defaultGstRate: 18,
   razorpayActive: true,
+  onlinePaymentEnabled: true,
+  codEnabled: false,
   razorpayKeyId: 'rzp_live_story_india',
   razorpayKeySecret: 'stored-in-backend-env',
   heroEyebrow: 'New editorial capsule',
@@ -349,10 +359,14 @@ export const defaultSettings: StoreSettings = {
   heroImagePrimary: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1100&q=85',
   heroImageSecondary: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
   heroImageDetail: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=700&q=85',
+  heroImageFourth: '',
+  heroImageFifth: '',
+  heroImageSixth: '',
   heroBadgeEyebrow: 'Story India 2026',
   heroBadgeText: 'Tailored quiet luxury',
   productsEyebrow: 'Seasonal selection',
   productsTitle: 'Our Products',
+  productsBody: 'Explore curated essentials across clothing, footwear, and everyday luxury.',
   homeProductIds: ['wide-legged-pants', 'relaxed-linen-shirt', 'crew-neck-sweater', 'classic-mini-dress', 'canvas-tote-bag', 'elongated-blazer', 'oversized-wool-coat', 'rib-knit-tank-top'],
   collectionEyebrow: 'Curated combinations',
   collectionTitle: 'Perfect Match',
@@ -366,7 +380,114 @@ export const defaultSettings: StoreSettings = {
   jewelryEyebrow: 'Accessories edit',
   jewelryTitle: 'Story Jewelry',
   jewelryBody: 'Adorn yourself with timeless accessories that complete every look.',
-  recommendationEyebrow: 'Selected next',
-  recommendationTitle: 'Recommendation',
-  recommendationProductIds: ['linen-wide-pants', 'faux-leather-jacket', 'gray-tube-top', 'drawstring-linen-pants', 'convertible-crossbody-bag']
+    recommendationEyebrow: 'Selected next',
+    recommendationTitle: 'Recommendation',
+    recommendationProductIds: ['linen-wide-pants', 'faux-leather-jacket', 'gray-tube-top', 'drawstring-linen-pants', 'convertible-crossbody-bag'],
+    aboutEyebrow: 'About STORY India',
+    aboutTitle: 'Verified Fashion, Curated In India',
+    aboutIntroParagraph1: 'STORY is a premium India-based fashion store built for people who want original branded pieces without the noise of fast, careless shopping.',
+    aboutIntroParagraph2: 'We curate verified branded fashion across uppers, lowers, dresses, co-ords, footwear, accessories, and inners, with a focus on authenticity, condition, price, and everyday Indian style.',
+    aboutPrimaryCtaText: 'Shop Verified Picks',
+    aboutSecondaryCtaText: 'View Curated Drops',
+    aboutImage1: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1200&q=85',
+    aboutImage2: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
+    aboutImage3: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85',
+    aboutBadgeText: 'Premium branded fashion, checked, styled, and priced for modern Indian wardrobes.',
+    aboutStats: [['2026', 'Founded'], ['7', 'Core categories'], ['100%', 'Original focus'], ['INDIA', 'Curated for']],
+    aboutValuesEyebrow: 'Our standard',
+    aboutValuesTitle: 'Original Pieces, Clear Checks',
+    aboutValues: [
+      {
+        title: 'Authentic',
+        text: 'Every piece is checked for brand identity, condition, finish, and everyday wearability before it enters the STORY edit.'
+      },
+      {
+        title: 'Curated',
+        text: 'We select branded fashion for Indian wardrobes: sharp layers, premium basics, clean footwear, and easy occasion pieces.'
+      },
+      {
+        title: 'Value',
+        text: 'The goal is simple: original branded fashion, better prices, and quality that feels worth returning to.'
+      }
+    ],
+    aboutPromiseEyebrow: 'The STORY promise',
+    aboutPromiseTitle: 'Verified Authentic. Best Price. Better Quality.',
+    aboutPromiseBody: 'From first scroll to final delivery, STORY keeps the edit focused: real branded pieces, clean product presentation, reliable support, and fashion that fits Indian everyday life.',
+    aboutPromiseImage: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1000&q=85',
+    privacyPolicy: 'We respect your privacy and use customer information only to process orders, provide support, improve the shopping experience, and meet legal or payment requirements. We do not sell customer data. Payment information is processed securely by our payment partners.',
+    termsConditions: 'By using STORY India, you agree to provide accurate account, delivery, and payment information. Product availability, pricing, promotions, and delivery timelines may change without prior notice. Orders are confirmed only after successful payment and verification.',
+    returnRefundPolicy: 'Returns or exchanges may be requested for eligible unused products within the return window shown at purchase. Items must be returned with tags, packaging, and invoice. Refunds are processed to the original payment method after quality check approval.',
+    storyCategories: [
+    {
+      key: 'uppers',
+      label: 'Uppers',
+      eyebrow: 'Sharp layers',
+      description: 'Shirts, jackets, tees and layers built for polished everyday dressing.',
+      cta: 'Shop Uppers',
+      categories: ['TOP', 'SHIRTS', 'KNITWEAR', 'OUTERWEAR'],
+      imageFallback: '/category/women/uppers.png',
+      images: { men: '/category/men/uppers.png', women: '/category/women/uppers.png' }
+    },
+    {
+      key: 'lowers',
+      label: 'Lowers',
+      eyebrow: 'Tailored ease',
+      description: 'Trousers, denim and relaxed fits with clean lines and wearable structure.',
+      cta: 'Shop Lowers',
+      categories: ['BOTTOM'],
+      imageFallback: '/category/women/lowers.png',
+      images: { men: '/category/men/lowers.png', women: '/category/women/lowers.png' }
+    },
+    {
+      key: 'dresses',
+      label: 'Dresses',
+      eyebrow: 'Evening lines',
+      description: 'Statement silhouettes for women, edited for dinners, events and city days.',
+      cta: 'Shop Dresses',
+      categories: ['DRESSES'],
+      imageFallback: '/category/women/dresses.png',
+      images: { women: '/category/women/dresses.png' }
+    },
+    {
+      key: 'co-ords',
+      label: 'Co-ords',
+      eyebrow: 'Matched sets',
+      description: 'Coordinated sets that make complete styling feel intentional and effortless.',
+      cta: 'Shop Co-ords',
+      categories: ['CO-ORDS', 'COORDS', 'SETS'],
+      imageFallback: '/category/women/co-ords.png',
+      images: { men: '/category/men/co-ords.png', women: '/category/women/co-ords.png' }
+    },
+    {
+      key: 'footwear',
+      label: 'Footwear',
+      eyebrow: 'Grounded polish',
+      description: 'Sneakers, shoes and premium pairs selected to anchor the full look.',
+      cta: 'Shop Footwear',
+      categories: ['SHOES', 'FOOTWEAR'],
+      imageFallback: '/category/women/footwear.png',
+      images: { men: '/category/men/footwear.png', women: '/category/women/footwear.png' }
+    },
+    {
+      key: 'accessories',
+      label: 'Accessories',
+      eyebrow: 'Finishing codes',
+      description: 'Socks, bags and finishing details that complete the STORY wardrobe.',
+      cta: 'Shop Accessories',
+      categories: ['ACCESSORY', 'ACCESSORIES', 'SOCKS'],
+      imageFallback: '/category/accessories.png',
+      images: { default: '/category/accessories.png' },
+      subcategories: ['Socks']
+    },
+    {
+      key: 'inners',
+      label: 'Inners',
+      eyebrow: 'Daily foundation',
+      description: 'Everyday comfort essentials made to sit quietly under every outfit.',
+      cta: 'Shop Inners',
+      categories: ['INNER', 'INNERS', 'UNDERWEAR'],
+      imageFallback: '/category/women/inners.png',
+      images: { men: '/category/men/inners.png', women: '/category/women/inners.png' }
+    }
+  ]
 };

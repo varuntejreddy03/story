@@ -39,16 +39,17 @@ interface LoginViewProps {
     firstName: string;
     lastName: string;
     email: string;
-    phone?: string;
+    phone: string;
     password: string;
   }) => Promise<AuthResult>;
   onForgotPassword?: (email: string) => Promise<unknown>;
+  onCompletePhone?: (phone: string, profile: Partial<UserProfile>) => Promise<Partial<UserProfile>>;
   googleClientId?: string;
   intent?: 'account' | 'checkout';
   onBack?: () => void;
 }
 
-type AuthMode = 'signin' | 'signup' | 'forgot';
+type AuthMode = 'signin' | 'signup' | 'forgot' | 'phone';
 type AuthStatus = 'idle' | 'authenticating' | 'success';
 
 const CHECKOUT_POINTS = [
@@ -103,6 +104,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onGoogleSignIn,
   onSignUp,
   onForgotPassword,
+  onCompletePhone,
   googleClientId = '',
   intent = 'account',
   onBack
@@ -120,6 +122,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [signUpPhone, setSignUpPhone] = React.useState('');
   const [signUpPassword, setSignUpPassword] = React.useState('');
   const [forgotEmail, setForgotEmail] = React.useState('');
+  const [phoneCompletionValue, setPhoneCompletionValue] = React.useState('');
+  const [pendingAuthSession, setPendingAuthSession] = React.useState<AuthResult | null>(null);
 
   const isCheckout = intent === 'checkout';
 
@@ -133,6 +137,19 @@ export const LoginView: React.FC<LoginViewProps> = ({
     }, 650);
   }, [isCheckout, onLoginSuccess]);
 
+  const continueWithSession = React.useCallback((session: AuthResult) => {
+    if (!session.user.phone?.trim() && onCompletePhone) {
+      setPendingAuthSession(session);
+      setPhoneCompletionValue('');
+      setMode('phone');
+      setStatus('idle');
+      setFeedbackMsg('PHONE NUMBER REQUIRED');
+      return;
+    }
+
+    finishAuth(session.user, session.token);
+  }, [finishAuth, onCompletePhone]);
+
   const handleGoogleCredential = React.useCallback(async (idToken: string) => {
     if (!onGoogleSignIn) return;
 
@@ -141,16 +158,16 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
     try {
       const session = await onGoogleSignIn(idToken);
-      finishAuth(session.user, session.token);
+      continueWithSession(session);
     } catch (error) {
       setStatus('idle');
       setFeedbackMsg(error instanceof Error ? error.message : 'GOOGLE SIGN IN FAILED');
     }
-  }, [finishAuth, onGoogleSignIn]);
+  }, [continueWithSession, onGoogleSignIn]);
 
   React.useEffect(() => {
     const target = googleButtonRef.current;
-    if (!target || mode === 'forgot' || !googleClientId || !onGoogleSignIn) return;
+    if (!target || mode === 'forgot' || mode === 'phone' || !googleClientId || !onGoogleSignIn) return;
 
     let cancelled = false;
     target.innerHTML = '';
@@ -205,7 +222,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     try {
       if (onSignIn) {
         const session = await onSignIn(signInEmail, signInPassword);
-        finishAuth(session.user, session.token);
+        continueWithSession(session);
         return;
       }
 
@@ -223,7 +240,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
   const handleSignUpSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!signUpFirstName || !signUpLastName || !signUpEmail || !signUpPassword) return;
+    if (!signUpFirstName || !signUpLastName || !signUpEmail || !signUpPhone || !signUpPassword) return;
 
     setStatus('authenticating');
     setFeedbackMsg('CREATING PROFILE');
@@ -237,19 +254,40 @@ export const LoginView: React.FC<LoginViewProps> = ({
           phone: signUpPhone,
           password: signUpPassword
         });
-        finishAuth(session.user, session.token);
+        continueWithSession(session);
         return;
       }
 
-      finishAuth({
+      continueWithSession({
+        user: {
         firstName: signUpFirstName,
         lastName: signUpLastName,
         email: signUpEmail,
-        phone: signUpPhone || '+91 98765 43210'
+        phone: signUpPhone
+        }
       });
     } catch (error) {
       setStatus('idle');
       setFeedbackMsg(error instanceof Error ? error.message : 'ACCOUNT CREATION FAILED');
+    }
+  };
+
+  const handlePhoneCompletionSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!phoneCompletionValue.trim() || !pendingAuthSession) return;
+
+    setStatus('authenticating');
+    setFeedbackMsg('SAVING PHONE');
+
+    try {
+      const updatedProfile = onCompletePhone
+        ? await onCompletePhone(phoneCompletionValue.trim(), pendingAuthSession.user)
+        : { ...pendingAuthSession.user, phone: phoneCompletionValue.trim() };
+      setPendingAuthSession(null);
+      finishAuth({ ...pendingAuthSession.user, ...updatedProfile, phone: phoneCompletionValue.trim() }, pendingAuthSession.token);
+    } catch (error) {
+      setStatus('idle');
+      setFeedbackMsg(error instanceof Error ? error.message : 'PHONE UPDATE FAILED');
     }
   };
 
@@ -277,6 +315,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const switchMode = (nextMode: AuthMode) => {
     setStatus('idle');
     setFeedbackMsg('');
+    setPendingAuthSession(null);
     setMode(nextMode);
   };
 
@@ -327,12 +366,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 {isCheckout ? 'Checkout access' : 'Account access'}
               </p>
               <h1 className="mt-2 font-display text-5xl font-black uppercase leading-none text-[#050505] sm:text-6xl">
-                {mode === 'forgot' ? 'Recover Access' : isCheckout ? 'Continue Securely' : 'Your STORY'}
+                {mode === 'phone' ? 'Add Phone' : mode === 'forgot' ? 'Recover Access' : isCheckout ? 'Continue Securely' : 'Your STORY'}
               </h1>
               <p className="mt-4 max-w-md text-sm leading-6 text-[#555555]">
-                {isCheckout
+                {mode === 'phone'
+                  ? 'Add a phone number so delivery updates, payment support, and order calls can reach you.'
+                  : isCheckout
                   ? 'Sign in to use saved India delivery details and complete secure Razorpay checkout.'
-                  : 'Manage your profile, addresses, wishlist, and STORY India order history.'}
+                  : 'Manage your profile, addresses, and STORY India order history.'}
               </p>
             </div>
 
@@ -460,6 +501,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     <AuthField label="Phone">
                       <input
                         id="reg-phone"
+                        required
                         className="w-full bg-transparent py-2 text-sm text-[#111111] placeholder:text-[#9a9a95]"
                         placeholder="+91"
                         value={signUpPhone}
@@ -482,6 +524,37 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     </AuthField>
 
                     <SubmitButton status={status} idleLabel={signupLabel} feedbackMsg={feedbackMsg} icon="signup" />
+                  </motion.form>
+                )}
+
+                {mode === 'phone' && (
+                  <motion.form
+                    key="phone"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.2 }}
+                    onSubmit={handlePhoneCompletionSubmit}
+                    className="space-y-6"
+                    id="phone-completion-form"
+                  >
+                    <div className="border border-[#deded9] bg-[#fafafa] p-4 text-xs leading-5 text-[#555555]">
+                      Phone number is required before checkout and account creation can continue.
+                    </div>
+
+                    <AuthField label="Phone number">
+                      <input
+                        id="phone-completion-input"
+                        required
+                        className="w-full bg-transparent py-2 text-sm text-[#111111] placeholder:text-[#9a9a95]"
+                        placeholder="+91"
+                        value={phoneCompletionValue}
+                        onChange={(event) => setPhoneCompletionValue(event.target.value)}
+                        disabled={status !== 'idle'}
+                      />
+                    </AuthField>
+
+                    <SubmitButton status={status} idleLabel="SAVE PHONE AND CONTINUE" feedbackMsg={feedbackMsg} />
                   </motion.form>
                 )}
 
@@ -526,7 +599,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 )}
               </AnimatePresence>
 
-              {mode !== 'forgot' && googleClientId && onGoogleSignIn && (
+              {mode !== 'forgot' && mode !== 'phone' && googleClientId && onGoogleSignIn && (
                 <div className="mt-6 space-y-4">
                   <div className="flex items-center gap-3">
                     <span className="h-px flex-1 bg-[#deded9]" />
@@ -539,7 +612,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </div>
               )}
 
-              {mode !== 'forgot' && (
+              {mode !== 'forgot' && mode !== 'phone' && (
                 <div className="mt-8 space-y-4 border-t border-[#deded9] pt-6">
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-xs text-[#666660]">

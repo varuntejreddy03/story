@@ -1,29 +1,25 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Product, StorefrontContent, StoryCategoryKey } from '../types';
+import { Category, Product, StorefrontContent } from '../types';
 import { PRODUCTS } from '../data';
-import { STORY_CATEGORIES, StoryCategory, StoryGender, filterProductsForStoryCategory } from '../categoryConfig';
 import { HeroSection } from './HeroSection';
 import { CustomerNotesSection } from './CustomerNotesSection';
 
 interface ShopViewProps {
   onSelectProduct: (product: Product) => void;
   setActiveScreen: (screen: any) => void;
-  onOpenCategory: (category: StoryCategoryKey) => void;
+  onOpenCategory: (categorySlug: string) => void;
   products?: Product[];
+  categories?: Category[];
   content: StorefrontContent;
 }
 
-const mainCategoryOrder: StoryCategoryKey[] = ['uppers', 'lowers', 'dresses', 'co-ords', 'footwear'];
-const secondaryCategoryOrder: StoryCategoryKey[] = ['accessories', 'inners'];
-
-const categoryImagePosition: Partial<Record<StoryCategoryKey, string>> = {
-  lowers: 'object-center',
-  footwear: 'object-center',
-  accessories: 'object-center',
-  inners: 'object-top'
-};
+const fallbackCategoryImages = [
+  'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=85',
+  'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=900&q=85',
+  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85'
+];
 
 function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false);
@@ -40,16 +36,15 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
-function CategoryImageRotator({ category }: { category: StoryCategory }) {
+function CategoryImageRotator({ category, fallbackImage }: { category: Category; fallbackImage: string }) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(false);
-  const imageEntries = React.useMemo(
-    () => (Object.entries(category.images) as [StoryGender | 'default', string][])
-      .filter((entry): entry is [StoryGender | 'default', string] => Boolean(entry[1])),
-    [category.images]
-  );
+  const imageEntries = React.useMemo(() => {
+    const entries = [category.image, fallbackImage].filter(Boolean);
+    return Array.from(new Set(entries));
+  }, [category.image, fallbackImage]);
 
   React.useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 639px)');
@@ -80,16 +75,20 @@ function CategoryImageRotator({ category }: { category: StoryCategory }) {
       onPointerDown={() => setIsPaused(true)}
       onPointerUp={() => setIsPaused(false)}
     >
-      {imageEntries.map(([label, src], index) => (
+      {imageEntries.map((src, index) => (
         <img
-          key={`${category.key}-${label}`}
+          key={`${category.id}-${src}`}
           src={src}
-          alt={`STORY ${category.label} ${label}`}
+          alt=""
+          aria-hidden="true"
           className={`absolute inset-0 h-full w-full object-cover grayscale contrast-[1.03] brightness-[1.08] transition duration-700 ${
             index === activeIndex ? 'opacity-100' : 'opacity-0'
-          } ${categoryImagePosition[category.key] || 'object-top'}`}
+          } object-top`}
           loading={index === 0 ? 'eager' : 'lazy'}
           referrerPolicy="no-referrer"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
         />
       ))}
     </span>
@@ -98,38 +97,46 @@ function CategoryImageRotator({ category }: { category: StoryCategory }) {
 
 function CategoryCard({
   category,
+  fallbackImage,
   featured = false,
   onOpenCategory,
   className = ''
 }: {
   key?: React.Key;
-  category: StoryCategory & { count: number };
+  category: Category & { count: number };
+  fallbackImage: string;
   featured?: boolean;
-  onOpenCategory: (category: StoryCategoryKey) => void;
+  onOpenCategory: (categorySlug: string) => void;
   className?: string;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onOpenCategory(category.key)}
-      aria-label={`Open ${category.label} category`}
+      onClick={() => onOpenCategory(category.slug)}
+      aria-label={`Open ${category.name} category`}
       className={`group relative min-h-[260px] overflow-hidden bg-[#f1f0ec] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white ${
         featured ? 'sm:min-h-[360px] lg:min-h-0' : 'sm:min-h-[260px] lg:min-h-0'
       } ${className}`}
     >
       <span className="absolute inset-0 transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.03]">
-        <CategoryImageRotator category={category} />
+        <CategoryImageRotator category={category} fallbackImage={fallbackImage} />
       </span>
-      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(0,0,0,0.72)] from-0% to-transparent to-[60%] transition duration-500 group-hover:from-[rgba(0,0,0,0.82)]" />
+      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(0,0,0,0.78)] from-0% via-[rgba(0,0,0,0.24)] via-[48%] to-transparent to-[72%] transition duration-500 group-hover:from-[rgba(0,0,0,0.86)]" />
       <span className="pointer-events-none absolute bottom-0 left-0 right-0 p-5 text-white sm:p-6">
+        <span className="mb-2 block font-mono text-[0.58rem] uppercase tracking-[0.18em] text-white/70">
+          {category.count} pieces
+        </span>
         <span
           className={`mb-[0.35rem] block font-medium uppercase leading-none tracking-[0.1em] text-white ${
             featured ? 'text-xl' : 'text-sm'
           }`}
         >
-          {category.label}
+          {category.name}
         </span>
-        <span className="block translate-y-1.5 font-mono text-[0.625rem] uppercase tracking-[0.15em] text-white/65 opacity-0 transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100">
+        <span className="mt-2 line-clamp-2 max-w-[18rem] text-xs leading-5 text-white/76">
+          {category.description || 'Explore STORY pieces selected for this category.'}
+        </span>
+        <span className="mt-4 block translate-y-1.5 font-mono text-[0.625rem] uppercase tracking-[0.15em] text-white/72 opacity-0 transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100">
           Shop Category <ArrowRight size={12} strokeWidth={1.5} className="ml-1 inline-block align-[-2px]" />
         </span>
       </span>
@@ -137,7 +144,10 @@ function CategoryCard({
   );
 }
 
-export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCategory, products, content }) => {
+const productMatchesCategory = (product: Product, category: Category) =>
+  product.categoryId === category.id || product.category.toLowerCase() === category.name.toLowerCase();
+
+export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCategory, products, categories = [], content }) => {
   const productSource = products && products.length > 0 ? products : PRODUCTS;
 
   const scrollToProducts = () => {
@@ -146,23 +156,17 @@ export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCateg
     }, 20);
   };
 
-  const categoryTiles = React.useMemo(() => STORY_CATEGORIES.map((category) => {
-    const categoryProducts = filterProductsForStoryCategory(productSource, category.key);
-    return {
+  const categoryTiles = React.useMemo(() => categories
+    .filter((category) => category.isActive !== false)
+    .slice()
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name))
+    .map((category) => ({
       ...category,
-      count: categoryProducts.length
-    };
-  }), [productSource]);
-  const categoryTileMap = React.useMemo(
-    () => new Map(categoryTiles.map((category) => [category.key, category])),
-    [categoryTiles]
-  );
-  const mainCategoryTiles = mainCategoryOrder
-    .map((key) => categoryTileMap.get(key))
-    .filter((category): category is StoryCategory & { count: number } => Boolean(category));
-  const secondaryCategoryTiles = secondaryCategoryOrder
-    .map((key) => categoryTileMap.get(key))
-    .filter((category): category is StoryCategory & { count: number } => Boolean(category));
+      count: productSource.filter((product) => productMatchesCategory(product, category)).length
+    })), [categories, productSource]);
+
+  const mainCategoryTiles = categoryTiles.slice(0, 5);
+  const secondaryCategoryTiles = categoryTiles.slice(5);
 
   return (
     <motion.div
@@ -186,7 +190,7 @@ export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCateg
             {content.productsTitle}
           </h2>
           <p className="mx-auto mt-4 max-w-[400px] text-[0.875rem] leading-6 text-[#555555]">
-            Explore curated essentials across clothing, footwear, and everyday luxury.
+            {content.productsBody}
           </p>
           <div className="mx-auto mt-7 h-px w-10 bg-[#111111]" aria-hidden="true" />
         </div>
@@ -194,8 +198,9 @@ export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCateg
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-[3px] bg-white sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr] lg:grid-rows-[260px_260px]">
           {mainCategoryTiles.map((category, index) => (
             <CategoryCard
-              key={category.key}
+              key={category.id}
               category={category}
+              fallbackImage={fallbackCategoryImages[index % fallbackCategoryImages.length]}
               featured={index === 0}
               onOpenCategory={onOpenCategory}
               className={index === 0 ? 'lg:col-start-1 lg:row-span-2 lg:row-start-1' : ''}
@@ -207,8 +212,9 @@ export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCateg
           <div className="mx-auto mt-[3px] grid max-w-6xl grid-cols-1 gap-[3px] bg-white sm:grid-cols-2 lg:grid-cols-3">
             {secondaryCategoryTiles.map((category) => (
               <CategoryCard
-                key={category.key}
+                key={category.id}
                 category={category}
+                fallbackImage={fallbackCategoryImages[categoryTiles.indexOf(category) % fallbackCategoryImages.length]}
                 onOpenCategory={onOpenCategory}
                 className="min-h-[220px] sm:min-h-[220px] lg:min-h-[200px]"
               />

@@ -2,19 +2,25 @@ import React from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
+  Check,
+  ChevronRight,
+  Download,
   Globe,
-  Heart,
   KeyRound,
   LogOut,
   Mail,
   MapPin,
   PackageCheck,
+  Printer,
+  Settings,
+  ShieldCheck,
   ShoppingBag,
-  Truck
+  Truck,
+  UserRound,
+  X
 } from 'lucide-react';
-import { motion } from 'motion/react';
-import { UserProfile, Address, Order } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { UserProfile, Address, Order, CartItem } from '../types';
 import { formatINR } from '../utils/currency';
 
 interface SettingsViewProps {
@@ -24,16 +30,18 @@ interface SettingsViewProps {
   setAddresses: (addresses: Address[]) => void;
   orders?: Order[];
   onSignOut?: () => void;
+  initialTab?: SettingsTab;
 }
 
-type SettingsTab = 'profile' | 'orders' | 'wishlist' | 'settings';
+type SettingsTab = 'profile' | 'orders' | 'settings';
 
-const tabs: Array<{ id: SettingsTab; label: string }> = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'orders', label: 'Orders' },
-  { id: 'wishlist', label: 'Wishlist' },
-  { id: 'settings', label: 'Settings' }
+const tabs: Array<{ id: SettingsTab; label: string; icon: React.ElementType }> = [
+  { id: 'profile', label: 'Profile', icon: UserRound },
+  { id: 'orders', label: 'Orders', icon: PackageCheck },
+  { id: 'settings', label: 'Settings', icon: Settings }
 ];
+
+const statusSteps = ['confirmed', 'processing', 'shipped', 'delivered'];
 
 const formatDate = (value?: string) => {
   if (!value) return 'Pending';
@@ -46,19 +54,23 @@ const formatDate = (value?: string) => {
   });
 };
 
+const titleCase = (value?: string) =>
+  (value || 'processing')
+    .replace(/_/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((item) => item.charAt(0).toUpperCase() + item.slice(1).toLowerCase())
+    .join(' ');
+
 const orderNumber = (id: string) => {
+  if (/^ST-/i.test(id)) return id;
   const clean = id.replace(/[^a-z0-9]/gi, '').toUpperCase();
-  return `#ORD-${clean.slice(-6) || 'STORY'}`;
+  return `ST-${clean.slice(-8) || 'STORY'}`;
 };
 
-const normalizeStatus = (status?: string) => (status || 'Processing').replace(/_/g, ' ');
-
 const addressLines = (address?: Address) => {
-  if (!address) {
-    return ['Kala Ghoda', 'Mumbai, Maharashtra 400001', 'India'];
-  }
+  if (!address) return ['No saved address'];
 
-  const lineOne = address.street || address.line1 || 'Kala Ghoda';
   const cityLine = [
     address.cityName || address.city,
     address.state,
@@ -66,12 +78,21 @@ const addressLines = (address?: Address) => {
   ].filter(Boolean).join(', ');
 
   return [
-    lineOne,
+    address.street || address.line1,
     address.line2,
-    cityLine || 'Mumbai, Maharashtra 400001',
+    cityLine,
     address.country || 'India'
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 };
+
+const statusIndex = (status?: string) => {
+  const normalized = (status || 'processing').toLowerCase();
+  if (normalized.includes('cancel')) return -1;
+  const index = statusSteps.findIndex((step) => normalized.includes(step));
+  return index >= 0 ? index : 1;
+};
+
+const itemTotal = (item: CartItem) => item.product.price * item.quantity;
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   userProfile,
@@ -79,29 +100,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   addresses,
   setAddresses,
   orders = [],
-  onSignOut
+  onSignOut,
+  initialTab = 'profile'
 }) => {
-  const [activeTab, setActiveTab] = React.useState<SettingsTab>('profile');
-  const [isEditing, setIsEditing] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<SettingsTab>(initialTab);
   const [selectedOrderId, setSelectedOrderId] = React.useState<string | null>(null);
-  const selectedOrder = React.useMemo(
-    () => orders.find((order) => order.id === selectedOrderId) || null,
-    [orders, selectedOrderId]
-  );
+  const [trackingOrder, setTrackingOrder] = React.useState<Order | null>(null);
+  const [invoiceOrder, setInvoiceOrder] = React.useState<Order | null>(null);
+  const [isEditingProfile, setIsEditingProfile] = React.useState(false);
+  const [isEditingAddress, setIsEditingAddress] = React.useState(false);
+  const [saveState, setSaveState] = React.useState<'idle' | 'saving' | 'saved'>('idle');
+  const [resetNotice, setResetNotice] = React.useState('');
 
   const primaryAddress = React.useMemo(
     () => addresses.find((address) => address.isDefault) || addresses[0],
     [addresses]
   );
 
+  const selectedOrder = React.useMemo(
+    () => orders.find((order) => order.id === selectedOrderId) || null,
+    [orders, selectedOrderId]
+  );
+
   const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim() || 'STORY Client';
-  const recentOrders = orders.slice(0, 2);
+  const deliveredOrders = orders.filter((order) => (order.status || '').toLowerCase().includes('delivered')).length;
+  const activeOrders = orders.filter((order) => !['delivered', 'cancelled'].some((status) => (order.status || '').toLowerCase().includes(status))).length;
   const totalSpend = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
 
   const [formFirstName, setFormFirstName] = React.useState(userProfile.firstName);
   const [formLastName, setFormLastName] = React.useState(userProfile.lastName);
   const [formEmail, setFormEmail] = React.useState(userProfile.email);
   const [formPhone, setFormPhone] = React.useState(userProfile.phone);
+  const [addressName, setAddressName] = React.useState(primaryAddress?.fullName || fullName);
+  const [addressStreet, setAddressStreet] = React.useState(primaryAddress?.street || primaryAddress?.line1 || '');
+  const [addressCity, setAddressCity] = React.useState(primaryAddress?.city || '');
+  const [addressCountry, setAddressCountry] = React.useState(primaryAddress?.country || 'India');
 
   React.useEffect(() => {
     setFormFirstName(userProfile.firstName);
@@ -110,53 +143,64 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setFormPhone(userProfile.phone);
   }, [userProfile]);
 
-  const handleEditToggle = async () => {
-    if (activeTab !== 'settings' || !isEditing) {
-      setActiveTab('settings');
-      setIsEditing(true);
-      return;
-    }
+  React.useEffect(() => {
+    setActiveTab(initialTab);
+    setSelectedOrderId(null);
+  }, [initialTab]);
 
+  React.useEffect(() => {
+    setAddressName(primaryAddress?.fullName || fullName);
+    setAddressStreet(primaryAddress?.street || primaryAddress?.line1 || '');
+    setAddressCity(primaryAddress?.city || '');
+    setAddressCountry(primaryAddress?.country || 'India');
+  }, [fullName, primaryAddress]);
+
+  const saveProfile = async () => {
+    setSaveState('saving');
     await setUserProfile({
       ...userProfile,
-      firstName: formFirstName,
-      lastName: formLastName,
-      email: formEmail,
-      phone: formPhone
+      firstName: formFirstName.trim(),
+      lastName: formLastName.trim(),
+      email: formEmail.trim(),
+      phone: formPhone.trim()
     });
-    setIsEditing(false);
+    setIsEditingProfile(false);
+    setSaveState('saved');
+    window.setTimeout(() => setSaveState('idle'), 1800);
   };
 
-  const handleNewsletterToggle = () => {
-    setUserProfile({
+  const saveAddress = () => {
+    const nextAddress: Address = {
+      ...primaryAddress,
+      fullName: addressName.trim() || fullName,
+      street: addressStreet.trim(),
+      city: addressCity.trim(),
+      country: addressCountry.trim() || 'India',
+      isDefault: true
+    };
+
+    const remaining = addresses.filter((address) => address.id !== primaryAddress?.id);
+    setAddresses([nextAddress, ...remaining]);
+    setIsEditingAddress(false);
+  };
+
+  const saveNewsletter = async () => {
+    await setUserProfile({
       ...userProfile,
       newsletter: !userProfile.newsletter
     });
   };
 
-  const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setUserProfile({
+  const saveLanguage = async (language: string) => {
+    await setUserProfile({
       ...userProfile,
-      language: event.target.value
+      language
     });
   };
 
-  const handleAddressEdit = () => {
-    const freshStreet = prompt('UPDATE DELIVERY STREET:', primaryAddress?.street || primaryAddress?.line1 || '');
-    const freshCity = prompt('UPDATE CITY / STATE / PIN:', primaryAddress?.city || '');
-
-    if (!freshStreet || !freshCity) return;
-
-    setAddresses([
-      {
-        ...primaryAddress,
-        fullName,
-        street: freshStreet,
-        city: freshCity,
-        country: primaryAddress?.country || 'India',
-        isDefault: true
-      }
-    ]);
+  const openOrder = (order: Order) => {
+    setSelectedOrderId(order.id);
+    setActiveTab('orders');
   };
 
   return (
@@ -164,400 +208,465 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.35 }}
+      transition={{ duration: 0.3 }}
       id="settings-view-container"
-      className="bg-[#f8f7f5] px-5 py-12 text-[#111111] sm:px-8 lg:px-20 lg:py-24"
+      className="bg-[#f6f5f1] px-4 py-8 text-[#111111] sm:px-6 lg:px-10 lg:py-12"
     >
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-24">
-        <aside className="border-b border-[#111111] pb-5 lg:border-b-0 lg:pb-0" id="account-sidebar">
-          <nav className="flex gap-6 overflow-x-auto lg:flex-col lg:gap-7">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setSelectedOrderId(null);
-                  if (tab.id !== 'settings') setIsEditing(false);
-                }}
-                aria-pressed={activeTab === tab.id}
-                className={`shrink-0 border-b pb-1 text-left font-mono text-[11px] uppercase transition ${
-                  activeTab === tab.id
-                    ? 'border-[#111111] text-[#111111]'
-                    : 'border-transparent text-[#565656] hover:border-[#111111] hover:text-[#111111]'
-                }`}
-                id={`sidebar-tab-${tab.id}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <header className="grid gap-4 rounded-lg border border-[#dedbd2] bg-white p-5 shadow-sm sm:p-6 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#6f6b62]">Account</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#111111] sm:text-4xl">
+              {fullName}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6a665d]">
+              {userProfile.email || 'No email added'}{userProfile.phone ? ` / ${userProfile.phone}` : ''}
+            </p>
+          </div>
           {onSignOut && (
             <button
               type="button"
               onClick={onSignOut}
-              className="mt-8 inline-flex items-center gap-2 border-b border-[#111111] pb-1 font-mono text-[10px] uppercase text-[#111111] transition hover:text-[#666666]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#111111] px-4 font-mono text-[10px] uppercase tracking-widest text-[#111111] transition hover:bg-[#111111] hover:text-white"
               id="sidebar-signout-btn"
             >
-              <LogOut size={13} strokeWidth={1.6} />
+              <LogOut size={14} strokeWidth={1.7} />
               Sign out
             </button>
           )}
-        </aside>
+        </header>
 
-        <main id="account-panel-contents">
-          {activeTab === 'profile' && (
-            <section className="space-y-12">
-              <div className="flex flex-col gap-5 border-b border-[#111111] pb-10 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <p className="mb-6 font-mono text-[10px] uppercase text-[#555555]">Profile</p>
-                  <h1 className="font-display text-5xl font-black uppercase leading-none text-[#050505] sm:text-6xl lg:text-7xl">
-                    {fullName}
-                  </h1>
-                </div>
-                <p className="font-mono text-[10px] uppercase text-[#111111]">Member since 2026</p>
-              </div>
-
-              <div className="border border-[#111111] bg-[#fbfaf8] p-6 sm:flex sm:items-center sm:justify-between sm:p-8">
-                <div>
-                  <p className="font-mono text-[10px] uppercase text-[#555555]">Status</p>
-                  <p className="mt-3 text-2xl font-semibold uppercase text-[#111111]">Archive Member</p>
-                </div>
-                <button
-                  type="button"
-                  className="mt-6 border-b border-[#111111] pb-1 font-mono text-[10px] uppercase text-[#111111] sm:mt-0"
-                >
-                  View benefits
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-x-12 gap-y-10 md:grid-cols-2">
-                <ProfileField label="Email address" value={userProfile.email || 'No email added'} />
-                <ProfileField label="Phone number" value={userProfile.phone || 'No phone added'} />
-                <ProfileField
-                  label="Default shipping"
-                  value={addressLines(primaryAddress).map((line, index) => (
-                    <span key={`${line}-${index}`} className="block">{line}</span>
-                  ))}
-                />
-                <div className="flex min-h-[82px] items-end border-b border-[#111111] pb-3">
+        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <nav className="grid grid-cols-4 overflow-hidden rounded-lg border border-[#dedbd2] bg-white shadow-sm lg:grid-cols-1" aria-label="Account sections">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
                   <button
+                    key={tab.id}
                     type="button"
-                    onClick={handleEditToggle}
-                    className="inline-flex items-center gap-3 font-mono text-[10px] uppercase text-[#111111] transition hover:text-[#666666]"
-                    id="profile-edit-details-btn"
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setSelectedOrderId(null);
+                    }}
+                    aria-pressed={isActive}
+                    className={`flex min-h-16 flex-col items-center justify-center gap-1 border-r border-[#ece9e1] px-2 text-center transition last:border-r-0 lg:min-h-0 lg:flex-row lg:justify-start lg:border-b lg:border-r-0 lg:px-4 lg:py-4 lg:text-left lg:last:border-b-0 ${
+                      isActive ? 'bg-[#111111] text-white' : 'text-[#5f5b52] hover:bg-[#f6f5f1] hover:text-[#111111]'
+                    }`}
+                    id={`sidebar-tab-${tab.id}`}
                   >
-                    Edit details
-                    <ArrowRight size={15} strokeWidth={1.6} />
+                    <Icon size={16} strokeWidth={1.6} />
+                    <span className="font-mono text-[9px] uppercase tracking-widest lg:text-[10px]">{tab.label}</span>
                   </button>
-                </div>
+                );
+              })}
+            </nav>
+
+            <div className="mt-4 hidden rounded-lg border border-[#dedbd2] bg-white p-5 shadow-sm lg:block">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">Account summary</p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <Metric label="Orders" value={String(orders.length)} />
+                <Metric label="Active" value={String(activeOrders)} />
+                <Metric label="Delivered" value={String(deliveredOrders)} />
+                <Metric label="Spend" value={formatINR(totalSpend)} compact />
               </div>
+            </div>
+          </aside>
 
-              <div className="border-t border-[#111111] pt-10">
-                <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <h2 className="font-mono text-[11px] uppercase text-[#111111]">Recent activity</h2>
-                  <p className="font-mono text-[10px] uppercase text-[#555555]">
-                    {orders.length} orders / {formatINR(totalSpend)}
-                  </p>
-                </div>
+          <main className="min-w-0" id="account-panel-contents">
+            {activeTab === 'profile' && (
+              <section className="grid gap-6">
+                <Panel title="Profile" meta="Member profile and saved delivery">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <InfoTile label="Email" value={userProfile.email || 'Not added'} icon={Mail} />
+                    <InfoTile label="Phone" value={userProfile.phone || 'Not added'} icon={ShieldCheck} />
+                    <InfoTile label="Orders" value={`${orders.length} placed`} icon={ShoppingBag} />
+                  </div>
 
-                <div className="divide-y divide-[#d8d6d0]">
-                  {recentOrders.map((order, index) => {
-                    const Icon = normalizeStatus(order.status).toLowerCase().includes('delivered')
-                      ? CheckCircle2
-                      : Truck;
+                  <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+                    <div className="rounded-lg border border-[#dedbd2] bg-[#fbfaf7] p-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">Recent orders</p>
+                          <h2 className="mt-1 text-xl font-semibold text-[#111111]">Latest activity</h2>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('orders')}
+                          className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-[#111111]"
+                        >
+                          View all
+                          <ArrowRight size={14} />
+                        </button>
+                      </div>
 
-                    return (
+                      <div className="mt-4 divide-y divide-[#e2ded5]">
+                        {orders.slice(0, 3).map((order) => (
+                          <OrderRow key={order.id} order={order} onOpen={() => openOrder(order)} />
+                        ))}
+                        {orders.length === 0 && (
+                          <EmptyBlock title="No orders yet" body="Your completed STORY orders will appear here." />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[#111111] bg-white p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">Default shipping</p>
+                          <h2 className="mt-1 text-lg font-semibold text-[#111111]">{primaryAddress?.fullName || fullName}</h2>
+                        </div>
+                        <MapPin size={18} strokeWidth={1.5} />
+                      </div>
+                      <div className="mt-4 space-y-1 text-sm leading-6 text-[#5f5b52]">
+                        {addressLines(primaryAddress).map((line) => (
+                          <p key={line}>{line}</p>
+                        ))}
+                      </div>
                       <button
-                        key={order.id}
                         type="button"
                         onClick={() => {
-                          setSelectedOrderId(order.id);
-                          setActiveTab('orders');
+                          setActiveTab('settings');
+                          setIsEditingAddress(true);
                         }}
-                        className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-5 py-6 text-left transition hover:bg-white"
+                        className="mt-5 inline-flex h-10 items-center gap-2 rounded-md border border-[#111111] px-4 font-mono text-[10px] uppercase tracking-widest transition hover:bg-[#111111] hover:text-white"
                       >
-                        <Icon size={20} strokeWidth={1.5} />
-                        <span>
-                          <span className="block text-base text-[#111111]">{orderNumber(order.id)}</span>
-                          <span className="mt-1 block font-mono text-[10px] uppercase text-[#555555]">
-                            {normalizeStatus(order.status)} - {formatDate(order.date)}
-                          </span>
-                        </span>
-                        <span className="text-sm font-medium text-[#111111]">{formatINR(order.total)}</span>
+                        Edit address
+                        <ChevronRight size={14} />
                       </button>
-                    );
-                  })}
-
-                  {recentOrders.length === 0 && (
-                    <div className="py-6 font-mono text-[10px] uppercase text-[#555555]">
-                      No orders yet.
                     </div>
-                  )}
-                </div>
+                  </div>
+                </Panel>
+              </section>
+            )}
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('orders')}
-                  className="mt-8 border-b border-[#111111] pb-1 font-mono text-[10px] uppercase text-[#111111] transition hover:text-[#666666]"
-                >
-                  View all orders
-                </button>
-              </div>
-            </section>
-          )}
+            {activeTab === 'orders' && (
+              <section className="grid gap-6">
+                {!selectedOrder ? (
+                  <Panel title="Orders" meta={`${orders.length} account orders`}>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <InfoTile label="Active" value={`${activeOrders} orders`} icon={Truck} />
+                      <InfoTile label="Delivered" value={`${deliveredOrders} orders`} icon={Check} />
+                      <InfoTile label="Total spend" value={formatINR(totalSpend)} icon={ShieldCheck} />
+                    </div>
 
-          {activeTab === 'orders' && (
-            <section className="space-y-10">
-              {!selectedOrderId ? (
-                <>
-                  <SectionHeader title="Orders" meta={`${orders.length} account orders`} />
-
-                  <div className="divide-y divide-[#d8d6d0] border-y border-[#111111]">
-                    {orders.map((order) => (
-                      <button
-                        key={order.id}
-                        type="button"
-                        onClick={() => setSelectedOrderId(order.id)}
-                        className="grid w-full grid-cols-1 gap-5 py-6 text-left transition hover:bg-white sm:grid-cols-[1.2fr_1fr_auto]"
-                        id={`api-past-order-${order.id}`}
-                      >
-                        <span>
-                          <span className="block text-lg font-medium uppercase">{orderNumber(order.id)}</span>
-                          <span className="mt-2 block font-mono text-[10px] uppercase text-[#555555]">
-                            {formatDate(order.date)}
-                          </span>
-                        </span>
-                        <span className="font-mono text-[10px] uppercase text-[#555555]">
-                          {normalizeStatus(order.status)}
-                        </span>
-                        <span className="text-base font-semibold">{formatINR(order.total)}</span>
-                      </button>
-                    ))}
-
-                    {orders.length === 0 && (
-                      <div className="py-10 font-mono text-[10px] uppercase text-[#555555]">
-                        No backend orders found for this account.
+                    <div className="mt-6 overflow-hidden rounded-lg border border-[#dedbd2]">
+                      <div className="hidden grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] bg-[#f6f5f1] px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62] md:grid">
+                        <span>Order</span>
+                        <span>Status</span>
+                        <span>Total</span>
+                        <span className="text-right">Actions</span>
                       </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <OrderDetail
-                  order={selectedOrder}
-                  selectedOrderId={selectedOrderId}
-                  onBack={() => setSelectedOrderId(null)}
-                />
-              )}
-            </section>
-          )}
-
-          {activeTab === 'wishlist' && (
-            <section className="space-y-10">
-              <SectionHeader title="Wishlist" meta="Saved editorial selections" />
-
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="group">
-                  <div className="aspect-[3/4] overflow-hidden bg-[#ecebe7]">
-                    <img
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwez49vlj7_YZtV0AqNHjUuC9EH9NpRnVx7sXuL8EHaA0eq82IX0LjNjImLPKCDwiI3pUdWFfYuBLnEryYgKRzRq7hsdMRIbTT22xIad0JVGqSxgQ9gxpdebhzYEgmL6BiUMZ-TtGD5oMVJuBY3knKUJkYq3ie3HwugefrNnyYI95e5bF-BN2XIFqYv9CGgEcKF3s3plKGAet4pO4U6yo-2MTWNTVsaVK7ybv00O2YtqzfGwQlXQCMEasn1ZnijtoeJ5XW9H5WkHQ"
-                      alt="Wishlist pant item"
-                      className="h-full w-full object-cover grayscale transition duration-500 group-hover:scale-[1.03]"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div className="mt-4 flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium uppercase">Tailored Leather Trousers</h3>
-                      <p className="mt-1 font-mono text-[10px] uppercase text-[#555555]">{formatINR(2990)}</p>
+                      <div className="divide-y divide-[#ece9e1] bg-white">
+                        {orders.map((order) => (
+                          <OrderListCard
+                            key={order.id}
+                            order={order}
+                            onOpen={() => openOrder(order)}
+                            onTrack={() => setTrackingOrder(order)}
+                            onInvoice={() => setInvoiceOrder(order)}
+                          />
+                        ))}
+                        {orders.length === 0 && (
+                          <EmptyBlock title="No backend orders found" body="Orders appear after a successful Razorpay payment." />
+                        )}
+                      </div>
                     </div>
-                    <Heart size={17} strokeWidth={1.5} />
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {activeTab === 'settings' && (
-            <section className="space-y-12" id="settings-tab-panel">
-              <SectionHeader title="Settings" meta="Profile, address, and preferences" />
-
-              <div className="space-y-8">
-                <div className="flex flex-col gap-5 border-b border-[#111111] pb-6 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold uppercase">Personal information</h2>
-                    <p className="mt-2 font-mono text-[10px] uppercase text-[#555555]">Account identity</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleEditToggle}
-                    className="inline-flex w-fit items-center gap-2 bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase text-white transition hover:bg-black"
-                    id="settings-edit-profile-btn"
-                  >
-                    {isEditing ? 'Save changes' : 'Edit'}
-                    <ArrowRight size={14} strokeWidth={1.6} />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 gap-x-12 gap-y-8 md:grid-cols-2">
-                  <EditableField
-                    label="First name"
-                    value={formFirstName}
-                    isEditing={isEditing}
-                    onChange={setFormFirstName}
+                  </Panel>
+                ) : (
+                  <OrderDetail
+                    order={selectedOrder}
+                    onBack={() => setSelectedOrderId(null)}
+                    onTrack={() => setTrackingOrder(selectedOrder)}
+                    onInvoice={() => setInvoiceOrder(selectedOrder)}
                   />
-                  <EditableField
-                    label="Last name"
-                    value={formLastName}
-                    isEditing={isEditing}
-                    onChange={setFormLastName}
-                  />
-                  <EditableField
-                    label="Email address"
-                    value={formEmail}
-                    type="email"
-                    isEditing={isEditing}
-                    onChange={setFormEmail}
-                  />
-                  <EditableField
-                    label="Phone number"
-                    value={formPhone}
-                    isEditing={isEditing}
-                    onChange={setFormPhone}
-                  />
-                </div>
-              </div>
+                )}
+              </section>
+            )}
 
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                <div className="border-t border-[#111111] pt-6">
-                  <div className="mb-6 flex items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold uppercase">Default shipping</h2>
-                      <p className="mt-2 font-mono text-[10px] uppercase text-[#555555]">India delivery address</p>
+
+
+            {activeTab === 'settings' && (
+              <section className="grid gap-6">
+                <Panel title="Settings" meta="Personal details, address, and preferences">
+                  <div className="grid gap-6">
+                    <div className="rounded-lg border border-[#dedbd2] bg-white p-5">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h2 className="text-lg font-semibold text-[#111111]">Personal information</h2>
+                          <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">
+                            {saveState === 'saving' ? 'Saving' : saveState === 'saved' ? 'Saved' : 'Account identity'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => (isEditingProfile ? saveProfile() : setIsEditingProfile(true))}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#111111] px-5 font-mono text-[10px] uppercase tracking-widest text-white transition hover:bg-black disabled:cursor-wait disabled:opacity-70"
+                          disabled={saveState === 'saving'}
+                          id="settings-edit-profile-btn"
+                        >
+                          {isEditingProfile ? 'Save details' : 'Edit details'}
+                          <ArrowRight size={14} />
+                        </button>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                        <EditableField label="First name" value={formFirstName} isEditing={isEditingProfile} onChange={setFormFirstName} />
+                        <EditableField label="Last name" value={formLastName} isEditing={isEditingProfile} onChange={setFormLastName} />
+                        <EditableField label="Email address" value={formEmail} type="email" isEditing={isEditingProfile} onChange={setFormEmail} />
+                        <EditableField label="Phone number" value={formPhone} isEditing={isEditingProfile} onChange={setFormPhone} />
+                      </div>
                     </div>
-                    <MapPin size={19} strokeWidth={1.5} />
-                  </div>
 
-                  <div className="border border-[#111111] bg-[#fbfaf8] p-6">
-                    <p className="font-medium uppercase">{primaryAddress?.fullName || fullName}</p>
-                    <div className="mt-4 space-y-1 text-sm leading-6 text-[#333333]">
-                      {addressLines(primaryAddress).map((line, index) => (
-                        <p key={`${line}-${index}`}>{line}</p>
-                      ))}
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      <div className="rounded-lg border border-[#dedbd2] bg-white p-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h2 className="text-lg font-semibold text-[#111111]">Default shipping</h2>
+                            <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">India delivery address</p>
+                          </div>
+                          <MapPin size={18} strokeWidth={1.5} />
+                        </div>
+
+                        {isEditingAddress ? (
+                          <div className="mt-5 grid gap-3">
+                            <EditableField label="Full name" value={addressName} isEditing onChange={setAddressName} />
+                            <EditableField label="Street" value={addressStreet} isEditing onChange={setAddressStreet} />
+                            <EditableField label="City / state / pincode" value={addressCity} isEditing onChange={setAddressCity} />
+                            <EditableField label="Country" value={addressCountry} isEditing onChange={setAddressCountry} />
+                            <div className="flex gap-3">
+                              <button type="button" onClick={saveAddress} className="h-10 rounded-md bg-[#111111] px-4 font-mono text-[10px] uppercase tracking-widest text-white">
+                                Save address
+                              </button>
+                              <button type="button" onClick={() => setIsEditingAddress(false)} className="h-10 rounded-md border border-[#cfcac0] px-4 font-mono text-[10px] uppercase tracking-widest">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="mt-5 rounded-md bg-[#fbfaf7] p-4 text-sm leading-6 text-[#5f5b52]">
+                              <p className="font-semibold text-[#111111]">{primaryAddress?.fullName || fullName}</p>
+                              {addressLines(primaryAddress).map((line) => (
+                                <p key={line}>{line}</p>
+                              ))}
+                            </div>
+                            <button type="button" onClick={() => setIsEditingAddress(true)} className="mt-4 h-10 rounded-md border border-[#111111] px-4 font-mono text-[10px] uppercase tracking-widest transition hover:bg-[#111111] hover:text-white">
+                              Update address
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border border-[#dedbd2] bg-white p-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h2 className="text-lg font-semibold text-[#111111]">Security</h2>
+                            <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">Password access</p>
+                          </div>
+                          <KeyRound size={18} strokeWidth={1.5} />
+                        </div>
+                        <div className="mt-5 rounded-md bg-[#fbfaf7] p-4">
+                          <p className="text-sm font-semibold text-[#111111]">Recovery email</p>
+                          <p className="mt-1 text-sm text-[#6a665d]">{userProfile.email || 'No email added'}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResetNotice(`Recovery mail prepared for ${userProfile.email || 'your account email'}.`);
+                            window.setTimeout(() => setResetNotice(''), 3000);
+                          }}
+                          className="mt-4 h-10 rounded-md border border-[#111111] px-4 font-mono text-[10px] uppercase tracking-widest transition hover:bg-[#111111] hover:text-white"
+                        >
+                          Reset passcode
+                        </button>
+                        {resetNotice && (
+                          <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-700">
+                            {resetNotice}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleAddressEdit}
-                      className="mt-6 border-b border-[#111111] pb-1 font-mono text-[10px] uppercase"
-                    >
-                      Update address
-                    </button>
-                  </div>
-                </div>
 
-                <div className="border-t border-[#111111] pt-6">
-                  <div className="mb-6 flex items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold uppercase">Security</h2>
-                      <p className="mt-2 font-mono text-[10px] uppercase text-[#555555]">Password access</p>
+                    <div className="rounded-lg border border-[#dedbd2] bg-white p-5">
+                      <h2 className="text-lg font-semibold text-[#111111]">Preferences</h2>
+                      <div className="mt-5 divide-y divide-[#ece9e1] rounded-lg border border-[#ece9e1]">
+                        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-[#111111]">STORY journal newsletter</p>
+                            <p className="mt-1 text-sm text-[#6a665d]">Capsule launches, private sale notices, and delivery updates.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={saveNewsletter}
+                            aria-pressed={userProfile.newsletter}
+                            className={`relative h-8 w-16 rounded-full border p-1 transition ${
+                              userProfile.newsletter ? 'border-[#111111] bg-[#111111]' : 'border-[#111111] bg-white'
+                            }`}
+                            id="newsletter-preference-toggle"
+                          >
+                            <span
+                              className={`block h-full w-6 rounded-full transition ${
+                                userProfile.newsletter ? 'translate-x-8 bg-white' : 'translate-x-0 bg-[#111111]'
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="inline-flex items-center gap-2 text-sm font-semibold text-[#111111]">
+                              <Globe size={15} strokeWidth={1.5} />
+                              Preferred language
+                            </p>
+                            <p className="mt-1 text-sm text-[#6a665d]">Used for account and delivery communication.</p>
+                          </div>
+                          <select
+                            value={userProfile.language}
+                            onChange={(event) => saveLanguage(event.target.value)}
+                            className="h-11 w-full rounded-md border border-[#111111] bg-white px-3 font-mono text-[10px] uppercase tracking-widest text-[#111111] sm:w-56"
+                            id="language-preference-dropdown"
+                          >
+                            <option value="ENGLISH">ENGLISH</option>
+                            <option value="HINDI">HINDI</option>
+                            <option value="MARATHI">MARATHI</option>
+                            <option value="TAMIL">TAMIL</option>
+                            <option value="BENGALI">BENGALI</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                    <KeyRound size={19} strokeWidth={1.5} />
                   </div>
-
-                  <div className="border border-[#d8d6d0] bg-white p-6">
-                    <p className="text-sm font-medium uppercase">Encrypted password key</p>
-                    <p className="mt-3 font-mono text-[10px] uppercase leading-5 text-[#555555]">
-                      Recovery email will be sent to {userProfile.email || 'your account email'}.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => alert(`Password recovery mail has been triggered to: ${userProfile.email}`)}
-                      className="mt-6 border border-[#111111] px-5 py-3 font-mono text-[10px] uppercase"
-                    >
-                      Reset passcode
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-[#111111] pt-6">
-                <h2 className="text-xl font-semibold uppercase">Preferences</h2>
-                <div className="mt-6 divide-y divide-[#d8d6d0] border-y border-[#d8d6d0] bg-white">
-                  <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-medium uppercase">STORY journal newsletter</p>
-                      <p className="mt-2 font-mono text-[10px] uppercase leading-5 text-[#555555]">
-                        Seasonal capsules, launch access, and private sale notices.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleNewsletterToggle}
-                      aria-pressed={userProfile.newsletter}
-                      className={`h-7 w-14 border p-1 transition ${
-                        userProfile.newsletter ? 'border-[#111111] bg-[#111111]' : 'border-[#111111] bg-white'
-                      }`}
-                      id="newsletter-preference-toggle"
-                    >
-                      <span
-                        className={`block h-full w-5 bg-white transition ${
-                          userProfile.newsletter ? 'translate-x-7' : 'translate-x-0 bg-[#111111]'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="inline-flex items-center gap-2 text-sm font-medium uppercase">
-                        <Globe size={15} strokeWidth={1.5} />
-                        Preferred language
-                      </p>
-                      <p className="mt-2 font-mono text-[10px] uppercase leading-5 text-[#555555]">
-                        UI and delivery communication language.
-                      </p>
-                    </div>
-                    <select
-                      value={userProfile.language}
-                      onChange={handleLanguageChange}
-                      className="w-full border border-[#111111] bg-white px-4 py-3 font-mono text-[10px] uppercase text-[#111111] sm:w-52"
-                      id="language-preference-dropdown"
-                    >
-                      <option value="ENGLISH">ENGLISH</option>
-                      <option value="HINDI">HINDI</option>
-                      <option value="MARATHI">MARATHI</option>
-                      <option value="TAMIL">TAMIL</option>
-                      <option value="BENGALI">BENGALI</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-        </main>
+                </Panel>
+              </section>
+            )}
+          </main>
+        </div>
       </div>
+
+      <AnimatePresence>
+        {trackingOrder && (
+          <TrackingModal order={trackingOrder} onClose={() => setTrackingOrder(null)} />
+        )}
+        {invoiceOrder && (
+          <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
 
-function SectionHeader({ title, meta }: { title: string; meta: string }) {
+function Panel({ title, meta, children }: { title: string; meta: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-5 border-b border-[#111111] pb-8 sm:flex-row sm:items-end sm:justify-between">
-      <h1 className="font-display text-5xl font-black uppercase leading-none text-[#050505] sm:text-6xl">
-        {title}
-      </h1>
-      <p className="font-mono text-[10px] uppercase text-[#555555]">{meta}</p>
+    <div className="rounded-lg border border-[#dedbd2] bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-6 flex flex-col gap-2 border-b border-[#ece9e1] pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#6f6b62]">{meta}</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#111111] sm:text-3xl">{title}</h1>
+        </div>
+      </div>
+      {children}
     </div>
   );
 }
 
-function ProfileField({ label, value }: { label: string; value: React.ReactNode }) {
+function Metric({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="min-h-[82px] border-b border-[#111111] pb-3">
-      <p className="mb-3 font-mono text-[10px] uppercase text-[#555555]">{label}</p>
-      <div className="text-base leading-7 text-[#111111]">{value}</div>
+    <div className="rounded-md border border-[#ece9e1] bg-[#fbfaf7] p-3">
+      <p className="font-mono text-[9px] uppercase tracking-widest text-[#6f6b62]">{label}</p>
+      <p className={`mt-1 font-semibold text-[#111111] ${compact ? 'text-sm' : 'text-lg'}`}>{value}</p>
     </div>
+  );
+}
+
+function InfoTile({ label, value, icon: Icon }: { label: string; value: string; icon: React.ElementType }) {
+  return (
+    <div className="rounded-lg border border-[#dedbd2] bg-[#fbfaf7] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">{label}</p>
+        <Icon size={16} strokeWidth={1.5} />
+      </div>
+      <p className="mt-3 break-words text-base font-semibold text-[#111111]">{value}</p>
+    </div>
+  );
+}
+
+const OrderRow: React.FC<{ order: Order; onOpen: () => void }> = ({ order, onOpen }) => {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="grid w-full gap-3 py-4 text-left transition hover:bg-white sm:grid-cols-[1fr_auto_auto] sm:items-center"
+    >
+      <span>
+        <span className="block text-sm font-semibold text-[#111111]">{orderNumber(order.id)}</span>
+        <span className="mt-1 block font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">
+          {formatDate(order.date)}
+        </span>
+      </span>
+      <StatusBadge status={order.status} />
+      <span className="font-mono text-xs font-semibold text-[#111111]">{formatINR(order.total)}</span>
+    </button>
+  );
+};
+
+const OrderListCard: React.FC<{
+  order: Order;
+  onOpen: () => void;
+  onTrack: () => void;
+  onInvoice: () => void;
+}> = ({
+  order,
+  onOpen,
+  onTrack,
+  onInvoice
+}) => {
+  return (
+    <div className="grid gap-4 p-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] md:items-center">
+      <button type="button" onClick={onOpen} className="text-left">
+        <span className="block text-sm font-semibold text-[#111111]">{orderNumber(order.id)}</span>
+        <span className="mt-1 block font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">{formatDate(order.date)}</span>
+      </button>
+      <StatusBadge status={order.status} />
+      <span className="font-mono text-sm font-semibold text-[#111111]">{formatINR(order.total)}</span>
+      <div className="flex flex-wrap gap-2 md:justify-end">
+        <ActionButton onClick={onOpen} label="Details" icon={ChevronRight} />
+        <ActionButton onClick={onTrack} label="Track" icon={Truck} />
+        <ActionButton onClick={onInvoice} label="Invoice" icon={Printer} />
+      </div>
+    </div>
+  );
+};
+
+function StatusBadge({ status }: { status?: string }) {
+  const normalized = (status || 'processing').toLowerCase();
+  const className = normalized.includes('delivered')
+    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    : normalized.includes('cancel')
+      ? 'bg-red-50 text-red-700 border-red-200'
+      : normalized.includes('shipped')
+        ? 'bg-neutral-950 text-white border-neutral-950'
+        : 'bg-amber-50 text-amber-700 border-amber-200';
+
+  return (
+    <span className={`inline-flex w-fit items-center rounded-full border px-3 py-1 font-mono text-[9px] uppercase tracking-widest ${className}`}>
+      {titleCase(status)}
+    </span>
+  );
+}
+
+function ActionButton({ onClick, label, icon: Icon }: { onClick: () => void; label: string; icon: React.ElementType }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-9 items-center gap-2 rounded-md border border-[#dedbd2] px-3 font-mono text-[9px] uppercase tracking-widest text-[#111111] transition hover:border-[#111111] hover:bg-[#111111] hover:text-white"
+      title={label}
+    >
+      <Icon size={13} strokeWidth={1.6} />
+      {label}
+    </button>
   );
 }
 
@@ -575,136 +684,263 @@ function EditableField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block border-b border-[#111111] pb-3">
-      <span className="mb-3 block font-mono text-[10px] uppercase text-[#555555]">{label}</span>
+    <label className="block">
+      <span className="mb-2 block font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">{label}</span>
       {isEditing ? (
         <input
           type={type}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full bg-transparent text-base text-[#111111] outline-none"
+          className="h-11 w-full rounded-md border border-[#cfcac0] bg-white px-3 text-sm text-[#111111] outline-none transition focus:border-[#111111] focus:ring-1 focus:ring-[#111111]"
         />
       ) : (
-        <span className="block min-h-7 text-base text-[#111111]">{value || 'Not added'}</span>
+        <span className="flex min-h-11 items-center rounded-md border border-[#ece9e1] bg-[#fbfaf7] px-3 text-sm text-[#111111]">
+          {value || 'Not added'}
+        </span>
       )}
     </label>
   );
 }
 
+function EmptyBlock({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="p-8 text-center">
+      <p className="text-sm font-semibold text-[#111111]">{title}</p>
+      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#6a665d]">{body}</p>
+    </div>
+  );
+}
+
 function OrderDetail({
   order,
-  selectedOrderId,
-  onBack
+  onBack,
+  onTrack,
+  onInvoice
 }: {
-  order: Order | null;
-  selectedOrderId: string;
+  order: Order;
   onBack: () => void;
+  onTrack: () => void;
+  onInvoice: () => void;
 }) {
   return (
-    <div className="space-y-10" id="order-details-panel">
+    <div className="rounded-lg border border-[#dedbd2] bg-white p-5 shadow-sm sm:p-6" id="order-details-panel">
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-2 font-mono text-[10px] uppercase text-[#555555] transition hover:text-[#111111]"
+        className="mb-5 inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62] transition hover:text-[#111111]"
       >
         <ArrowLeft size={14} strokeWidth={1.6} />
         Back to orders
       </button>
 
-      <div className="flex flex-col gap-5 border-b border-[#111111] pb-8 md:flex-row md:items-end md:justify-between">
+      <div className="grid gap-5 border-b border-[#ece9e1] pb-5 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
-          <p className="mb-3 font-mono text-[10px] uppercase text-[#555555]">Order detail</p>
-          <h1 className="font-display text-4xl font-black uppercase leading-none sm:text-5xl">
-            {orderNumber(selectedOrderId)}
-          </h1>
+          <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#6f6b62]">Order detail</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[#111111] sm:text-3xl">{orderNumber(order.id)}</h1>
+          <p className="mt-2 text-sm text-[#6a665d]">{formatDate(order.date)} / {order.paymentMethod || 'Razorpay'}</p>
         </div>
-        <span className="border border-[#111111] bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase text-white">
-          {normalizeStatus(order?.status)}
-        </span>
+        <div className="flex flex-wrap gap-2">
+          <ActionButton onClick={onTrack} label="Track order" icon={Truck} />
+          <ActionButton onClick={onInvoice} label="View invoice" icon={Printer} />
+        </div>
       </div>
 
-      {order ? (
-        <>
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-            <ProfileField label="Order date" value={formatDate(order.date)} />
-            <ProfileField label="Payment" value={order.paymentMethod || 'Razorpay'} />
-            <ProfileField label="Total" value={formatINR(order.total)} />
-          </div>
-
-          <div className="divide-y divide-[#d8d6d0] border-y border-[#111111]">
-            {order.items.map((item) => (
-              <div key={item.id} className="grid grid-cols-[88px_1fr] gap-5 py-6 sm:grid-cols-[112px_1fr_auto]">
-                <div className="aspect-[3/4] overflow-hidden bg-[#ecebe7]">
-                  {item.product.image ? (
-                    <img
-                      src={item.product.image}
-                      alt={item.product.name}
-                      className="h-full w-full object-cover grayscale"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <ShoppingBag size={20} strokeWidth={1.4} />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium uppercase">{item.product.name}</h3>
-                  <p className="mt-3 font-mono text-[10px] uppercase text-[#555555]">
-                    {item.selectedColor.name} / {item.selectedSize} / Qty {item.quantity}
-                  </p>
-                </div>
-                <p className="self-start text-sm font-semibold">{formatINR(item.product.price)}</p>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="overflow-hidden rounded-lg border border-[#dedbd2]">
+          {order.items.map((item) => (
+            <div key={item.id} className="grid grid-cols-[80px_1fr] gap-4 border-b border-[#ece9e1] p-4 last:border-b-0 sm:grid-cols-[96px_1fr_auto]">
+              <div className="aspect-[3/4] overflow-hidden rounded-md bg-[#ece9e1]">
+                {item.product.image ? (
+                  <img src={item.product.image} alt={item.product.name} className="h-full w-full object-cover grayscale" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[#6f6b62]">
+                    <ShoppingBag size={18} />
+                  </div>
+                )}
               </div>
-            ))}
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold uppercase text-[#111111]">{item.product.name}</h3>
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">
+                  {item.selectedColor.name} / {item.selectedSize} / Qty {item.quantity}
+                </p>
+              </div>
+              <p className="font-mono text-sm font-semibold text-[#111111] sm:text-right">{formatINR(itemTotal(item))}</p>
+            </div>
+          ))}
+          {order.items.length === 0 && <EmptyBlock title="No items returned" body="The order exists, but item rows were not returned by the API." />}
+        </div>
+
+        <div className="grid gap-4">
+          <div className="rounded-lg border border-[#dedbd2] bg-[#fbfaf7] p-5">
+            <h2 className="font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">Delivery</h2>
+            <div className="mt-3 text-sm leading-6 text-[#5f5b52]">
+              <p className="font-semibold text-[#111111]">{order.address?.fullName}</p>
+              {addressLines(order.address).map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-[1fr_360px]">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => alert(order.trackingUrl || 'Tracking details will appear after fulfillment update.')}
-                className="inline-flex items-center justify-center gap-2 bg-[#111111] px-6 py-4 font-mono text-[10px] uppercase text-white"
-              >
-                <PackageCheck size={15} strokeWidth={1.6} />
-                Track order
-              </button>
-              <button
-                type="button"
-                onClick={() => alert(`Invoice for ${orderNumber(order.id)} will be available after payment confirmation.`)}
-                className="inline-flex items-center justify-center gap-2 border border-[#111111] px-6 py-4 font-mono text-[10px] uppercase"
-              >
-                <Mail size={15} strokeWidth={1.6} />
-                View invoice
-              </button>
-            </div>
-
-            <div className="border border-[#111111] bg-[#fbfaf8] p-6">
-              <h3 className="mb-5 font-mono text-[10px] uppercase">Summary</h3>
+          <div className="rounded-lg border border-[#111111] bg-white p-5">
+            <h2 className="font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">Summary</h2>
+            <div className="mt-4 space-y-3">
               <SummaryRow label="Subtotal" value={formatINR(order.subtotal)} />
-              <SummaryRow label="Shipping" value={formatINR(order.shipping)} />
+              <SummaryRow label="Shipping" value={order.shipping === 0 ? 'Complimentary' : formatINR(order.shipping)} />
               <SummaryRow label="GST" value={formatINR(order.tax)} />
-              <div className="mt-5 flex justify-between border-t border-[#111111] pt-4 text-sm font-semibold uppercase">
+              <div className="flex justify-between border-t border-[#111111] pt-4 text-sm font-semibold uppercase">
                 <span>Total</span>
                 <span>{formatINR(order.total)}</span>
               </div>
             </div>
           </div>
-        </>
-      ) : (
-        <div className="border border-[#111111] bg-white p-8 font-mono text-[10px] uppercase text-[#555555]">
-          Backend order record unavailable.
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+function TrackingModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  const current = statusIndex(order.status);
+
+  return (
+    <motion.div className="fixed inset-0 z-50 flex items-end bg-black/40 p-0 sm:items-center sm:justify-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:max-w-lg sm:rounded-lg sm:p-6"
+      >
+        <ModalHeader title="Track order" meta={orderNumber(order.id)} onClose={onClose} />
+        <div className="mt-6 space-y-4">
+          {statusSteps.map((step, index) => {
+            const done = current >= index;
+            return (
+              <div key={step} className="grid grid-cols-[28px_1fr] gap-3">
+                <span className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-full border ${done ? 'border-[#111111] bg-[#111111] text-white' : 'border-[#d8d3c9] text-[#8a867c]'}`}>
+                  {done ? <Check size={14} /> : index + 1}
+                </span>
+                <div className="pb-4">
+                  <p className="text-sm font-semibold text-[#111111]">{titleCase(step)}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#6a665d]">
+                    {index === 0 && 'Order received by STORY.'}
+                    {index === 1 && 'Items are being packed for dispatch.'}
+                    {index === 2 && 'Package is with the delivery partner.'}
+                    {index === 3 && 'Order delivered.'}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {order.trackingUrl ? (
+          <a
+            href={order.trackingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#111111] px-5 py-4 font-mono text-[10px] uppercase tracking-widest text-white"
+          >
+            Open courier tracking
+            <ArrowRight size={14} />
+          </a>
+        ) : (
+          <div className="mt-4 rounded-lg border border-[#e8d58f] bg-[#fff9e6] p-4 text-sm leading-6 text-[#7f6000]">
+            Tracking link appears here after the fulfillment team ships this order.
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function InvoiceModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  return (
+    <motion.div className="fixed inset-0 z-50 flex items-end bg-black/40 p-0 sm:items-center sm:justify-center sm:p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:max-w-2xl sm:rounded-lg sm:p-6"
+      >
+        <ModalHeader title="Invoice" meta={orderNumber(order.id)} onClose={onClose} />
+        <div className="mt-6 rounded-lg border border-[#dedbd2] bg-[#fbfaf7] p-5" id="story-invoice-panel">
+          <div className="flex flex-col gap-4 border-b border-[#dedbd2] pb-5 sm:flex-row sm:justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">STORY India</p>
+              <h2 className="mt-1 text-xl font-semibold text-[#111111]">Tax invoice</h2>
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-[#6f6b62] sm:text-right">
+              <p>{orderNumber(order.id)}</p>
+              <p>{formatDate(order.date)}</p>
+            </div>
+          </div>
+
+          <div className="mt-5 overflow-hidden rounded-md border border-[#dedbd2] bg-white">
+            {order.items.map((item) => (
+              <div key={item.id} className="grid grid-cols-[1fr_auto] gap-4 border-b border-[#ece9e1] p-4 text-sm last:border-b-0">
+                <div>
+                  <p className="font-semibold text-[#111111]">{item.product.name}</p>
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">
+                    Qty {item.quantity} / {item.selectedSize} / {item.selectedColor.name}
+                  </p>
+                </div>
+                <p className="font-mono font-semibold">{formatINR(itemTotal(item))}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="ml-auto mt-5 max-w-sm space-y-3">
+            <SummaryRow label="Subtotal" value={formatINR(order.subtotal)} />
+            <SummaryRow label="Shipping" value={order.shipping === 0 ? 'Complimentary' : formatINR(order.shipping)} />
+            <SummaryRow label="GST" value={formatINR(order.tax)} />
+            <div className="flex justify-between border-t border-[#111111] pt-4 text-sm font-semibold uppercase">
+              <span>Total paid</span>
+              <span>{formatINR(order.total)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#111111] px-5 py-4 font-mono text-[10px] uppercase tracking-widest text-white"
+          >
+            <Printer size={14} />
+            Print invoice
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-[#111111] px-5 py-4 font-mono text-[10px] uppercase tracking-widest"
+          >
+            <Download size={14} />
+            Save as PDF
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ModalHeader({ title, meta, onClose }: { title: string; meta: string; onClose: () => void }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-[#ece9e1] pb-4">
+      <div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[#6f6b62]">{meta}</p>
+        <h2 className="mt-1 text-2xl font-semibold text-[#111111]">{title}</h2>
+      </div>
+      <button type="button" onClick={onClose} className="rounded-full border border-[#dedbd2] p-2 text-[#111111] transition hover:bg-[#111111] hover:text-white" aria-label="Close">
+        <X size={16} />
+      </button>
     </div>
   );
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mb-3 flex justify-between font-mono text-[10px] uppercase text-[#555555]">
+    <div className="flex justify-between gap-4 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">
       <span>{label}</span>
-      <span className="text-[#111111]">{value}</span>
+      <span className="font-semibold text-[#111111]">{value}</span>
     </div>
   );
 }

@@ -1,14 +1,19 @@
 import React from 'react';
+import { Instagram, Mail, MessageCircle, type LucideIcon } from 'lucide-react';
 import { ActiveScreen } from '../types';
+import { PolicyKey } from './PolicyView';
 
 interface FooterProps {
   setActiveScreen: (screen: ActiveScreen) => void;
+  onOpenPolicy: (policyKey: PolicyKey) => void;
 }
 
 type FooterLink = {
   label: string;
   screen?: ActiveScreen;
   sectionId?: string;
+  policyKey?: PolicyKey;
+  icon?: LucideIcon;
 };
 
 type FooterColumn = {
@@ -46,7 +51,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     links: [
       { label: 'Contact Us', screen: 'contact' },
       { label: 'Shipping & Delivery', screen: 'contact' },
-      { label: 'Returns & Exchange', screen: 'settings' },
+      { label: 'Returns & Exchange', policyKey: 'returns' },
       { label: 'Size Guide', screen: 'contact' },
       { label: 'FAQ', screen: 'contact' },
       { label: 'Track Order', screen: 'settings' }
@@ -55,19 +60,30 @@ const FOOTER_COLUMNS: FooterColumn[] = [
 ];
 
 const CONNECT_LINKS: FooterLink[] = [
-  { label: 'Instagram' },
-  { label: 'WhatsApp', screen: 'contact' },
-  { label: 'Email', screen: 'contact' }
+  { label: 'Instagram', icon: Instagram },
+  { label: 'WhatsApp', screen: 'contact', icon: MessageCircle },
+  { label: 'Email', screen: 'contact', icon: Mail }
 ];
 
-// TODO: Connect Privacy Policy and Terms & Conditions when legal routes are added.
 const LEGAL_LINKS: FooterLink[] = [
-  { label: 'Privacy Policy' },
-  { label: 'Terms & Conditions' }
+  { label: 'Privacy Policy', policyKey: 'privacy' },
+  { label: 'Terms & Conditions', policyKey: 'terms' },
+  { label: 'Return & Refund Policy', policyKey: 'returns' }
 ];
 
-export const Footer: React.FC<FooterProps> = ({ setActiveScreen }) => {
+const policyHref = (policyKey: PolicyKey) => {
+  if (policyKey === 'terms') return '/terms-conditions';
+  if (policyKey === 'returns') return '/return-refund-policy';
+  return '/privacy-policy';
+};
+
+export const Footer: React.FC<FooterProps> = ({ setActiveScreen, onOpenPolicy }) => {
   const handleFooterLink = (link: FooterLink) => {
+    if (link.policyKey) {
+      onOpenPolicy(link.policyKey);
+      return;
+    }
+
     if (link.screen) {
       setActiveScreen(link.screen);
     }
@@ -80,11 +96,28 @@ export const Footer: React.FC<FooterProps> = ({ setActiveScreen }) => {
   };
 
   const renderLink = (link: FooterLink) => {
+    const linkClassName = "inline-block text-left text-[#696965] transition duration-200 hover:translate-x-1 hover:text-[#111111] hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#111111] focus-visible:ring-offset-4";
+
+    if (link.policyKey) {
+      return (
+        <a
+          href={policyHref(link.policyKey)}
+          onClick={(event) => {
+            event.preventDefault();
+            handleFooterLink(link);
+          }}
+          className={linkClassName}
+        >
+          {link.label}
+        </a>
+      );
+    }
+
     if (!link.screen && !link.sectionId) {
       return (
         <a
           href="#"
-          className="inline-block text-[#696965] transition duration-200 hover:translate-x-1 hover:text-[#111111] hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#111111] focus-visible:ring-offset-4"
+          className={linkClassName}
         >
           {link.label}
         </a>
@@ -95,7 +128,7 @@ export const Footer: React.FC<FooterProps> = ({ setActiveScreen }) => {
       <button
         type="button"
         onClick={() => handleFooterLink(link)}
-        className="inline-block text-left text-[#696965] transition duration-200 hover:translate-x-1 hover:text-[#111111] hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#111111] focus-visible:ring-offset-4"
+        className={linkClassName}
       >
         {link.label}
       </button>
@@ -114,6 +147,40 @@ export const Footer: React.FC<FooterProps> = ({ setActiveScreen }) => {
       </ul>
     </nav>
   );
+
+  const renderConnectIcon = (link: FooterLink) => {
+    const Icon = link.icon;
+    if (!Icon) return null;
+
+    const iconClassName = "inline-flex h-10 w-10 items-center justify-center border border-[#111111]/20 bg-white text-[#111111] transition duration-200 hover:-translate-y-0.5 hover:border-[#111111] hover:bg-[#111111] hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-[#111111] focus-visible:ring-offset-4";
+    const iconContent = (
+      <>
+        <Icon size={18} strokeWidth={1.7} />
+        <span className="sr-only">{link.label}</span>
+      </>
+    );
+
+    if (!link.screen && !link.sectionId) {
+      return (
+        <a key={link.label} href="#" className={iconClassName} aria-label={link.label} title={link.label}>
+          {iconContent}
+        </a>
+      );
+    }
+
+    return (
+      <button
+        key={link.label}
+        type="button"
+        onClick={() => handleFooterLink(link)}
+        className={iconClassName}
+        aria-label={link.label}
+        title={link.label}
+      >
+        {iconContent}
+      </button>
+    );
+  };
 
   return (
     <footer className="border-t border-black/10 bg-[#f6f6f3] text-[#111111]" id="global-footer">
@@ -134,9 +201,25 @@ export const Footer: React.FC<FooterProps> = ({ setActiveScreen }) => {
             <p className="mt-6 text-sm leading-6 text-[#4f4f4b]">
               Verified branded fashion, curated in India for everyday premium style.
             </p>
-            <p className="mt-6 max-w-sm font-mono text-[0.62rem] uppercase leading-5 tracking-[0.16em] text-[#696965]">
-              Verified authentic pieces &bull; 100% original &bull; Best price & quality
-            </p>
+            <div className="mt-8 flex items-start">
+              <div className="relative h-28 w-28 shrink-0 sm:h-32 sm:w-32">
+                <svg className="absolute inset-0 h-full w-full animate-[spin_20s_linear_infinite]" viewBox="0 0 200 200">
+                  <defs>
+                    <path id="footerCirclePath" d="M 100,100 m -76,0 a 76,76 0 1,1 152,0 a 76,76 0 1,1 -152,0" fill="none" />
+                  </defs>
+                  <text className="fill-[#4f4f4b]" style={{ fontSize: '11.2px', fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase' }}>
+                    <textPath href="#footerCirclePath" startOffset="0%">
+                      Verified authentic • 100% original • Best price &amp; quality •&nbsp;
+                    </textPath>
+                  </text>
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[#111111]/20 sm:h-14 sm:w-14">
+                    <span className="font-display text-[0.55rem] font-black uppercase tracking-[0.06em] text-[#111111] sm:text-[0.6rem]">STORY</span>
+                  </span>
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="hidden grid-cols-4 gap-8 lg:grid">
@@ -149,15 +232,13 @@ export const Footer: React.FC<FooterProps> = ({ setActiveScreen }) => {
               <p className="mt-5 max-w-[220px] text-sm leading-6 text-[#4f4f4b]">
                 Need help finding your fit? Our team can help with size, styling, delivery, and product questions.
               </p>
-              <ul className="mt-5 space-y-3 font-mono text-[0.68rem] uppercase tracking-[0.08em]">
-                {CONNECT_LINKS.map((link) => (
-                  <li key={link.label}>{renderLink(link)}</li>
-                ))}
-              </ul>
+              <div className="mt-5 flex items-center gap-3">
+                {CONNECT_LINKS.map(renderConnectIcon)}
+              </div>
               <p className="mt-5 font-mono text-[0.58rem] uppercase leading-5 tracking-[0.12em] text-[#8a8a84]">
-                WhatsApp: Add client number here
+                WhatsApp: +91 98765 43210
                 <br />
-                Email: Add support email here
+                Email: care@story.in
               </p>
             </nav>
           </div>
@@ -185,11 +266,9 @@ export const Footer: React.FC<FooterProps> = ({ setActiveScreen }) => {
               <p className="mt-5 text-sm leading-6 text-[#4f4f4b]">
                 Need help finding your fit? Our team can help with size, styling, delivery, and product questions.
               </p>
-              <ul className="mt-5 space-y-3 font-mono text-[0.68rem] uppercase tracking-[0.08em]">
-                {CONNECT_LINKS.map((link) => (
-                  <li key={link.label}>{renderLink(link)}</li>
-                ))}
-              </ul>
+              <div className="mt-5 flex items-center gap-3">
+                {CONNECT_LINKS.map(renderConnectIcon)}
+              </div>
             </details>
           </div>
         </div>

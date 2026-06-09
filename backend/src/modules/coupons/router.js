@@ -1,7 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/db.js';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAdminAuth, requireAuth } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { toNumber } from '../../utils/money.js';
@@ -68,7 +68,7 @@ couponsRouter.post('/validate', requireAuth, validate(z.object({
   res.json({ success: true, data: validateCouponForSubtotal(coupon, subtotal) });
 }));
 
-adminCouponsRouter.use(requireAuth, requireAdmin);
+adminCouponsRouter.use(requireAdminAuth);
 
 adminCouponsRouter.get('/', asyncHandler(async (_req, res) => {
   const coupons = await prisma.coupon.findMany({

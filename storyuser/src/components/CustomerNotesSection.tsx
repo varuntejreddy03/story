@@ -1,14 +1,9 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, X } from 'lucide-react';
+import { storyApi } from '../api';
+import { CustomerReview } from '../types';
 
-interface Testimonial {
-  name: string;
-  tag: string;
-  rating: number;
-  review: string;
-}
-
-const DEFAULT_TESTIMONIALS: Testimonial[] = [
+const DEFAULT_TESTIMONIALS: CustomerReview[] = [
   {
     name: 'Sanjay Gupta',
     tag: 'FAST DELIVERY',
@@ -103,7 +98,7 @@ function useVisibleTestimonialCount() {
 export function CustomerNotesSection() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const visibleCount = useVisibleTestimonialCount();
-  const [testimonials, setTestimonials] = React.useState<Testimonial[]>(DEFAULT_TESTIMONIALS);
+  const [testimonials, setTestimonials] = React.useState<CustomerReview[]>(DEFAULT_TESTIMONIALS);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(false);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -111,15 +106,17 @@ export function CustomerNotesSection() {
   const [form, setForm] = React.useState({ name: '', rating: '5', category: '', review: '' });
 
   React.useEffect(() => {
-    const savedReviews = window.localStorage.getItem('story_customer_notes');
-    if (!savedReviews) return;
+    let mounted = true;
 
-    try {
-      const parsed = JSON.parse(savedReviews) as Testimonial[];
-      if (Array.isArray(parsed)) setTestimonials([...parsed, ...DEFAULT_TESTIMONIALS]);
-    } catch {
-      undefined;
-    }
+    storyApi.reviews()
+      .then((reviews) => {
+        if (mounted && reviews.length > 0) setTestimonials(reviews);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   React.useEffect(() => {
@@ -145,10 +142,10 @@ export function CustomerNotesSection() {
     return { testimonial: testimonials[index], index };
   });
 
-  const submitReview = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitReview = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const nextReview: Testimonial = {
+    const nextReview: CustomerReview = {
       name: form.name.trim() || 'STORY Customer',
       tag: (form.category.trim() || 'VERIFIED PURCHASE').toUpperCase(),
       rating: Number(form.rating) || 5,
@@ -157,13 +154,16 @@ export function CustomerNotesSection() {
 
     if (!nextReview.review) return;
 
-    const savedReviews = [nextReview, ...testimonials.filter((item) => !DEFAULT_TESTIMONIALS.includes(item))];
-    // TODO: Replace localStorage persistence with backend review submission when the API is available.
-    window.localStorage.setItem('story_customer_notes', JSON.stringify(savedReviews));
-    setTestimonials([nextReview, ...testimonials]);
-    setActiveIndex(0);
-    setSubmitted(true);
-    setForm({ name: '', rating: '5', category: '', review: '' });
+    try {
+      await storyApi.createReview(nextReview);
+      setSubmitted(true);
+      setForm({ name: '', rating: '5', category: '', review: '' });
+    } catch {
+      setTestimonials([nextReview, ...testimonials]);
+      setActiveIndex(0);
+      setSubmitted(true);
+      setForm({ name: '', rating: '5', category: '', review: '' });
+    }
   };
 
   return (
@@ -262,7 +262,7 @@ export function CustomerNotesSection() {
             {submitted ? (
               <div className="border border-[#d8d8d3] bg-[#fafafa] px-5 py-8 text-center">
                 <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#111111]">
-                  Thank you. Your review has been submitted.
+                  Thank you. Your review has been submitted for approval.
                 </p>
               </div>
             ) : (

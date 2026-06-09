@@ -13,7 +13,7 @@ export function HeroSection({ content, onShopEdit, onViewLookbook }: HeroSection
   return (
     <>
       <section
-        className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 overflow-hidden px-4 pb-10 pt-10 sm:px-6 md:pt-16 lg:grid-cols-[0.92fr_1.08fr] lg:gap-14 lg:px-8"
+        className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 overflow-hidden px-4 pb-8 pt-4 sm:px-6 sm:pt-5 md:pt-7 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12 lg:px-8 lg:pt-8"
         id="editorial-hero"
       >
         <div className="max-w-3xl space-y-7">
@@ -30,24 +30,33 @@ export function HeroSection({ content, onShopEdit, onViewLookbook }: HeroSection
             <button
               type="button"
               onClick={onShopEdit}
-              className="inline-flex w-full items-center justify-center gap-2 bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase text-white transition hover:bg-black sm:w-auto"
+              className="group inline-flex w-full items-center justify-center gap-3 bg-[#111111] px-7 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-white shadow-[0_4px_20px_rgba(0,0,0,0.15)] transition hover:bg-black hover:shadow-[0_6px_28px_rgba(0,0,0,0.25)] sm:w-auto"
             >
-              {content.heroPrimaryCta || 'SHOP THE DROP'}
-              <ArrowRight size={14} strokeWidth={1.6} />
+              {content.heroPrimaryCta || 'EXPLORE COLLECTION'}
+              <ArrowRight size={14} strokeWidth={1.6} className="transition-transform duration-300 group-hover:translate-x-1" />
             </button>
             <button
               type="button"
               onClick={onViewLookbook}
-              className="inline-flex w-full items-center justify-center gap-2 border border-[#111111] bg-transparent px-5 py-3 font-mono text-[10px] uppercase text-[#111111] transition hover:bg-white sm:w-auto"
+              className="group inline-flex w-full items-center justify-center gap-3 border border-[#111111] bg-transparent px-7 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-[#111111] transition hover:bg-[#111111] hover:text-white sm:w-auto"
             >
-              {content.heroSecondaryCta || 'EXPLORE STYLE EDIT'}
-              <ArrowRight size={14} strokeWidth={1.6} />
+              {content.heroSecondaryCta || 'VIEW STYLE DIARY'}
+              <ArrowRight size={14} strokeWidth={1.6} className="transition-transform duration-300 group-hover:translate-x-1" />
             </button>
           </div>
         </div>
 
         <div className="min-w-0" aria-label="STORY editorial image slider">
-          <HeroImageSlider />
+          <HeroImageSlider
+            images={[
+              content.heroImagePrimary,
+              content.heroImageSecondary,
+              content.heroImageDetail,
+              content.heroImageFourth,
+              content.heroImageFifth,
+              content.heroImageSixth
+            ]}
+          />
         </div>
       </section>
 

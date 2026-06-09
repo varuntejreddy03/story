@@ -19,6 +19,7 @@ import { settingsRouter, adminSettingsRouter } from './modules/settings/router.j
 import { profileRouter } from './modules/profile/router.js';
 import { adminRouter } from './modules/admin/router.js';
 import { contactRouter, adminContactRouter } from './modules/contact/router.js';
+import { reviewsRouter, adminReviewsRouter } from './modules/reviews/router.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 const app = express();
@@ -43,10 +44,13 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use('/uploads', express.static(uploadsDir, {
-  etag: false,
-  maxAge: 0,
-  setHeaders(res) {
-    res.set('Cache-Control', 'public, max-age=0');
+  etag: true,
+  maxAge: '7d',
+  immutable: true,
+  setHeaders(res, filePath) {
+    if (/\.(jpg|jpeg|png|webp|gif|avif)$/i.test(filePath)) {
+      res.set('Cache-Control', 'public, max-age=604800, immutable');
+    }
   }
 }));
 app.use('/api', (_req, res, next) => {
@@ -90,6 +94,7 @@ app.use('/api/payment', paymentRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/contact', contactRouter);
+app.use('/api/reviews', reviewsRouter);
 
 app.use('/api/admin/products', adminProductsRouter);
 app.use('/api/admin/categories', adminCategoriesRouter);
@@ -97,6 +102,7 @@ app.use('/api/admin/coupons', adminCouponsRouter);
 app.use('/api/admin/orders', adminOrdersRouter);
 app.use('/api/admin/settings', adminSettingsRouter);
 app.use('/api/admin/contact-requests', adminContactRouter);
+app.use('/api/admin/reviews', adminReviewsRouter);
 app.use('/api/admin', adminRouter);
 
 app.use(notFound);

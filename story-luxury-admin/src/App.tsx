@@ -16,6 +16,7 @@ import {
   CreditCard, 
   Settings, 
   MessageSquare,
+  Star,
   Clock, 
   ChevronRight,
   Menu,
@@ -25,11 +26,11 @@ import {
 } from 'lucide-react';
 
 // Models & mock seeds
-import { Product, Order, Category, Customer, PaymentTransaction, Coupon, StoreSettings, ContactRequest } from './types';
+import { Product, Order, Category, Customer, PaymentTransaction, Coupon, StoreSettings, ContactRequest, CustomerReview } from './types';
 import { 
   defaultSettings 
 } from './data';
-import { adminApi, AdminUser } from './api';
+import { adminApi, AdminUser, DashboardStats } from './api';
 
 // Custom modular view components
 import DashboardView from './components/DashboardView';
@@ -42,21 +43,24 @@ import InventoryView from './components/InventoryView';
 import PaymentsView from './components/PaymentsView';
 import SettingsView from './components/SettingsView';
 import ClientRequestsView from './components/ClientRequestsView';
+import ReviewsView from './components/ReviewsView';
 
 // Overlay action modals
-import { AddProductModal, AddCategoryModal, CreateCouponModal } from './components/Modals';
+import { AddProductModal, AddCategoryModal, CreateCouponModal, EditProductModal } from './components/Modals';
 
-type ViewTab = 'Dashboard' | 'Orders' | 'Products' | 'Categories' | 'Coupons' | 'Customers' | 'Inventory' | 'Payments' | 'Requests' | 'Settings';
+type ViewTab = 'Dashboard' | 'Orders' | 'Products' | 'Categories' | 'Coupons' | 'Customers' | 'Inventory' | 'Payments' | 'Requests' | 'Reviews' | 'Settings';
 
 export default function App() {
   // Current active view tab
   const [activeTab, setActiveTab] = useState<ViewTab>('Dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [authError, setAuthError] = useState('');
   const [dataError, setDataError] = useState('');
   const [dataLoading, setDataLoading] = useState(false);
+  const [globalSaveSuccess, setGlobalSaveSuccess] = useState('');
   const [loginEmail, setLoginEmail] = useState('admin@story.in');
   const [loginPassword, setLoginPassword] = useState('');
 
@@ -68,10 +72,13 @@ export default function App() {
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [contactRequests, setContactRequests] = useState<ContactRequest[]>([]);
+  const [reviews, setReviews] = useState<CustomerReview[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(defaultSettings);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
 
   // Modal display toggles
   const [addProductOpen, setAddProductOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [createCouponOpen, setCreateCouponOpen] = useState(false);
 
@@ -91,7 +98,9 @@ export default function App() {
         transactionsData,
         couponsData,
         contactRequestsData,
-        settingsData
+        reviewsData,
+        settingsData,
+        dashboardStatsData
       ] = await Promise.all([
         adminApi.products(),
         adminApi.orders(),
@@ -100,7 +109,9 @@ export default function App() {
         adminApi.payments(),
         adminApi.coupons(),
         adminApi.contactRequests(),
-        adminApi.settings()
+        adminApi.reviews(),
+        adminApi.settings(),
+        adminApi.dashboardStats()
       ]);
 
       setProducts(productsData);
@@ -110,7 +121,9 @@ export default function App() {
       setTransactions(transactionsData);
       setCoupons(couponsData);
       setContactRequests(contactRequestsData);
+      setReviews(reviewsData);
       setSettings(settingsData);
+      setDashboardStats(dashboardStatsData);
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Could not load admin data.');
       setProducts([]);
@@ -120,6 +133,8 @@ export default function App() {
       setTransactions([]);
       setCoupons([]);
       setContactRequests([]);
+      setReviews([]);
+      setDashboardStats(null);
     } finally {
       setDataLoading(false);
     }
@@ -177,6 +192,16 @@ export default function App() {
     }
   };
 
+  const handleUpdateProduct = async (prodId: string, patch: Partial<Product>) => {
+    try {
+      const updated = await adminApi.updateProduct(prodId, patch);
+      setProducts(prev => prev.map(p => p.id === prodId ? updated : p));
+      setEditingProduct(null);
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Could not update product.');
+    }
+  };
+
   const handleToggleProductStatus = async (prodId: string) => {
     const product = products.find(p => p.id === prodId);
     if (!product) return;
@@ -230,6 +255,15 @@ export default function App() {
     }
   };
 
+  const handleUpdateCategory = async (catId: string, patch: Partial<Category>) => {
+    try {
+      const updated = await adminApi.updateCategory(catId, patch);
+      setCategories(prev => prev.map(c => c.id === catId ? updated : c));
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Could not update category.');
+    }
+  };
+
   const handleCreateCoupon = async (newCoup: Omit<Coupon, 'usageUsed'>) => {
     try {
       const couponItem = await adminApi.createCoupon(newCoup);
@@ -254,14 +288,17 @@ export default function App() {
   const handleUpdateOrderStatus = async (
     orderId: string, 
     paymentStatus: Order['paymentStatus'], 
-    fulfillmentStatus: Order['fulfillmentStatus']
+    fulfillmentStatus: Order['fulfillmentStatus'],
+    trackingUrl?: string
   ) => {
     try {
-      const updated = await adminApi.updateOrderStatus(orderId, paymentStatus, fulfillmentStatus);
+      const updated = await adminApi.updateOrderStatus(orderId, paymentStatus, fulfillmentStatus, trackingUrl);
       setOrders(prev => prev.map(o => o.id === orderId ? updated : o));
       if (paymentStatus === 'Paid') {
         adminApi.payments().then(setTransactions).catch(() => undefined);
       }
+      setGlobalSaveSuccess('Order status updated');
+      setTimeout(() => setGlobalSaveSuccess(''), 3000);
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Could not update order status.');
     }
@@ -285,6 +322,24 @@ export default function App() {
     }
   };
 
+  const handleUpdateReviewStatus = async (id: string, status: CustomerReview['status']) => {
+    try {
+      const updated = await adminApi.updateReviewStatus(id, status);
+      setReviews(prev => prev.map(review => review.id === id ? updated : review));
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Could not update review.');
+    }
+  };
+
+  const handleDeleteReview = async (id: string) => {
+    try {
+      await adminApi.deleteReview(id);
+      setReviews(prev => prev.filter(review => review.id !== id));
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Could not delete review.');
+    }
+  };
+
   // Navigations sidebar configuration
   const navigationTabs: { id: ViewTab; label: string; icon: any }[] = [
     { id: 'Dashboard', label: 'Overview', icon: LayoutGrid },
@@ -296,6 +351,7 @@ export default function App() {
     { id: 'Inventory', label: 'Inventory', icon: Inbox },
     { id: 'Payments', label: 'Payments', icon: CreditCard },
     { id: 'Requests', label: 'Requests', icon: MessageSquare },
+    { id: 'Reviews', label: 'Reviews', icon: Star },
     { id: 'Settings', label: 'Settings', icon: Settings },
   ];
 
@@ -330,7 +386,9 @@ export default function App() {
     setTransactions([]);
     setCoupons([]);
     setContactRequests([]);
+    setReviews([]);
     setSettings(defaultSettings);
+    setDashboardStats(null);
   };
 
   if (authChecking) {
@@ -415,7 +473,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col font-sans selection:bg-neutral-900 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] flex flex-col font-sans selection:bg-neutral-900 selection:text-white h-screen overflow-hidden">
       
       {/* Upper Navigation Header bar themed */}
       <header className="bg-white border-b border-neutral-150 sticky top-0 z-40 px-6 py-4 flex items-center justify-between shadow-2xs">
@@ -476,11 +534,20 @@ export default function App() {
       )}
 
       {/* Main Grid View Container */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto relative">
+      <div className="flex-1 flex max-w-[1600px] w-full mx-auto relative overflow-hidden h-0">
         
-        {/* Desktop Sidebar menu rail */}
-        <aside className="hidden md:flex flex-col gap-1 w-64 p-5 py-8 border-r border-neutral-150 shrink-0 text-left bg-white/50">
-          <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-3 mb-4">Workspace Menu</p>
+        {/* Desktop Sidebar menu rail - sticky */}
+        <aside className={`hidden md:flex flex-col gap-1 py-8 border-r border-neutral-150 shrink-0 text-left bg-white/50 overflow-y-auto transition-all duration-300 ${sidebarCollapsed ? 'w-[68px] px-2' : 'w-64 p-5'}`}>
+          <div className={`flex items-center justify-between mb-4 ${sidebarCollapsed ? 'px-1' : 'pl-3'}`}>
+            {!sidebarCollapsed && <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Workspace Menu</p>}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-900 transition-colors"
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <ChevronRight size={14} className={`transition-transform duration-300 ${sidebarCollapsed ? '' : 'rotate-180'}`} />
+            </button>
+          </div>
           <nav className="flex flex-col gap-1">
             {navigationTabs.map((item) => {
               const Icon = item.icon;
@@ -489,14 +556,17 @@ export default function App() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-medium uppercase tracking-wider transition-all ${
+                  title={sidebarCollapsed ? item.label : undefined}
+                  className={`flex items-center gap-3 rounded-xl text-xs font-medium uppercase tracking-wider transition-all ${
+                    sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-3 py-3'
+                  } ${
                     isActive 
                       ? 'bg-neutral-900 text-white font-bold shadow-sm' 
                       : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950 font-semibold'
                   }`}
                 >
                   <Icon size={16} />
-                  <span>{item.label}</span>
+                  {!sidebarCollapsed && <span>{item.label}</span>}
                 </button>
               );
             })}
@@ -551,7 +621,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* Dynamic App Content Body Area wrapper */}
-        <main className="flex-1 p-6 md:p-8 overflow-x-hidden min-h-[calc(100vh-65px)]">
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto overflow-x-hidden">
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 5 }}
@@ -567,6 +637,7 @@ export default function App() {
                 onOpenAddProduct={() => setAddProductOpen(true)}
                 onOpenAddCategory={() => setAddCategoryOpen(true)}
                 onOpenCreateCoupon={() => setCreateCouponOpen(true)}
+                stats={dashboardStats}
               />
             )}
 
@@ -581,6 +652,7 @@ export default function App() {
               <ProductsView
                 products={products}
                 onOpenAddProduct={() => setAddProductOpen(true)}
+                onEditProduct={(product) => setEditingProduct(product)}
                 onToggleStatus={handleToggleProductStatus}
                 onDeleteProduct={handleDeleteProduct}
               />
@@ -589,9 +661,12 @@ export default function App() {
             {activeTab === 'Categories' && (
               <CategoriesView
                 categories={categories}
+                settings={settings}
                 onOpenAddCategory={() => setAddCategoryOpen(true)}
                 onDeleteCategory={handleDeleteCategory}
                 onToggleCategoryStatus={handleToggleCategoryStatus}
+                onUpdateCategory={handleUpdateCategory}
+                onSaveSettings={handleSaveSettings}
               />
             )}
 
@@ -629,6 +704,14 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'Reviews' && (
+              <ReviewsView
+                reviews={reviews}
+                onUpdateStatus={handleUpdateReviewStatus}
+                onDeleteReview={handleDeleteReview}
+              />
+            )}
+
             {activeTab === 'Settings' && (
               <SettingsView
                 settings={settings}
@@ -640,16 +723,39 @@ export default function App() {
         </main>
       </div>
 
-      {/* Persistent global luxury watermark footer */}
-      <footer className="mt-auto border-t border-neutral-150 py-5 bg-white text-center text-[10px] font-mono text-neutral-400 select-none">
-        <p className="uppercase tracking-[2px]">STORY India Admin Workspace / Established 2026</p>
-      </footer>
+      {/* Persistent global luxury watermark footer - inside main scroll */}
+
+      {/* Global save success toast */}
+      <AnimatePresence>
+        {globalSaveSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-[100] flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950 px-5 py-4 text-white shadow-2xl"
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7.5L5.5 10L11 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </span>
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-wider">{globalSaveSuccess}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating Action overlay modals */}
       <AddProductModal 
         isOpen={addProductOpen}
         onClose={() => setAddProductOpen(false)}
         onAdd={handleAddProduct}
+        categories={categories}
+      />
+
+      <EditProductModal
+        isOpen={Boolean(editingProduct)}
+        onClose={() => setEditingProduct(null)}
+        onSave={handleUpdateProduct}
+        categories={categories}
+        product={editingProduct}
       />
 
       <AddCategoryModal 

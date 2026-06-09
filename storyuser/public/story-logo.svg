@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="250" viewBox="0 0 1000 250">
+  <rect width="100%" height="100%" fill="none"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M500 37 C500 20 526 20 526 38 C526 49 512 53 512 65" stroke-width="7"/>
+    <path d="M512 65 L373 140" stroke-width="6"/>
+    <path d="M512 65 L627 140" stroke-width="6"/>
+  </g>
+  <text x="500" y="185" text-anchor="middle" fill="#fff" font-family="'Noto Serif Display', 'Didot', 'Bodoni 72', 'Times New Roman', serif" font-size="122" font-weight="400" letter-spacing="18">STORY</text>
+  <g fill="#fff" font-family="Inter, Montserrat, Arial, sans-serif" font-size="20" font-weight="600" letter-spacing="10">
+    <text x="500" y="231" text-anchor="middle">WRITE YOUR OWN FASHION</text>
+  </g>
+  <line x1="250" y1="223" x2="355" y2="223" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <line x1="645" y1="223" x2="750" y2="223" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+</svg>

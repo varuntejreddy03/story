@@ -5,13 +5,13 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Calendar, Filter, ChevronLeft, ChevronRight, X, Sparkles, AlertCircle } from 'lucide-react';
+import { Search, Calendar, Filter, ChevronLeft, ChevronRight, X, Receipt, Printer } from 'lucide-react';
 import { Order } from '../types';
 import { formatINR } from '../utils/currency';
 
 interface OrdersViewProps {
   orders: Order[];
-  onUpdateOrderStatus: (orderId: string, paymentStatus: Order['paymentStatus'], fulfillmentStatus: Order['fulfillmentStatus']) => void;
+  onUpdateOrderStatus: (orderId: string, paymentStatus: Order['paymentStatus'], fulfillmentStatus: Order['fulfillmentStatus'], trackingUrl?: string) => void;
 }
 
 export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewProps) {
@@ -22,6 +22,9 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
   // States for editing selected order
   const [editPaymentStatus, setEditPaymentStatus] = useState<Order['paymentStatus']>('Paid');
   const [editFulfillmentStatus, setEditFulfillmentStatus] = useState<Order['fulfillmentStatus']>('Processing');
+  const [editTrackingUrl, setEditTrackingUrl] = useState('');
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Filter logic
   const filteredOrders = orders.filter(order => {
@@ -33,34 +36,31 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
     return matchesSearch && order.paymentStatus === statusFilter;
   });
   const paidRevenue = orders.reduce((sum, order) => sum + (order.paymentStatus === 'Paid' ? order.amount : 0), 0);
-  const selectedOrderSubtotal = selectedOrder ? Math.round(selectedOrder.amount / 1.18) : 0;
-  const selectedOrderGst = selectedOrder ? selectedOrder.amount - selectedOrderSubtotal : 0;
-  const selectedOrderPrimaryItem = selectedOrderSubtotal > 8000
-    ? { name: 'Structured Blazer', sku: 'OUT-899-TPE', ratio: 0.64 }
-    : { name: 'Wide Leg Pants', sku: 'BTM-349-WHT', ratio: 0.58 };
-  const selectedOrderSecondaryItem = selectedOrderSubtotal > 8000
-    ? { name: 'Relaxed Linen Shirt', sku: 'TOP-449-LIN' }
-    : { name: 'Canvas Tote Bag', sku: 'ACC-249-ECR' };
-  const selectedOrderPrimaryAmount = Math.round(selectedOrderSubtotal * selectedOrderPrimaryItem.ratio);
-  const selectedOrderItems = [
-    { name: selectedOrderPrimaryItem.name, sku: selectedOrderPrimaryItem.sku, amount: selectedOrderPrimaryAmount },
-    { name: selectedOrderSecondaryItem.name, sku: selectedOrderSecondaryItem.sku, amount: selectedOrderSubtotal - selectedOrderPrimaryAmount }
-  ];
+  const selectedOrderItems = selectedOrder?.items || [];
+  const selectedOrderSubtotal = selectedOrder?.subtotal || selectedOrderItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const selectedOrderShipping = selectedOrder?.shipping || 0;
+  const selectedOrderGst = selectedOrder?.tax || Math.max(0, selectedOrder?.amount ? selectedOrder.amount - selectedOrderSubtotal - selectedOrderShipping : 0);
 
   const handleOpenOrder = (order: Order) => {
     setSelectedOrder(order);
     setEditPaymentStatus(order.paymentStatus);
     setEditFulfillmentStatus(order.fulfillmentStatus);
+    setEditTrackingUrl(order.trackingUrl || '');
+    setShowInvoice(false);
+    setSaveSuccess(false);
   };
 
   const handleSaveOrderChanges = () => {
     if (selectedOrder) {
-      onUpdateOrderStatus(selectedOrder.id, editPaymentStatus, editFulfillmentStatus);
+      onUpdateOrderStatus(selectedOrder.id, editPaymentStatus, editFulfillmentStatus, editTrackingUrl);
       setSelectedOrder({
         ...selectedOrder,
         paymentStatus: editPaymentStatus,
-        fulfillmentStatus: editFulfillmentStatus
+        fulfillmentStatus: editFulfillmentStatus,
+        trackingUrl: editTrackingUrl
       });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
     }
   };
 
@@ -104,14 +104,14 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         <div className="bg-white p-5 rounded-xl border border-neutral-150 shadow-xs hover:shadow-xs transition-shadow duration-300">
           <p className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-1.5">Total Orders</p>
-          <p className="text-2xl font-bold text-neutral-900">{(orders.length + 1240).toLocaleString()}</p>
+          <p className="text-2xl font-bold text-neutral-900">{orders.length.toLocaleString()}</p>
           <p className="text-[11px] font-mono text-neutral-500 mt-1 flex items-center gap-1">
             <span className="text-green-600 font-bold">+12%</span> this week
           </p>
         </div>
         <div className="bg-white p-5 rounded-xl border border-neutral-150 shadow-xs hover:shadow-xs transition-shadow duration-300">
           <p className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-1.5">Pending Fulfillment</p>
-          <p className="text-2xl font-bold text-neutral-900">{orders.filter(o => o.fulfillmentStatus !== 'Delivered').length + 38}</p>
+          <p className="text-2xl font-bold text-neutral-900">{orders.filter(o => o.fulfillmentStatus !== 'Delivered').length}</p>
           <p className="text-[11px] font-mono text-neutral-500 mt-1">Requires attention</p>
         </div>
         <div className="bg-white p-5 rounded-xl border border-neutral-150 shadow-xs hover:shadow-xs transition-shadow duration-300">
@@ -123,7 +123,7 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
         </div>
         <div className="bg-white p-5 rounded-xl border border-neutral-150 shadow-xs hover:shadow-xs transition-shadow duration-300">
           <p className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-1.5">Revenue Today</p>
-          <p className="text-2xl font-bold text-neutral-900">{formatINR(paidRevenue + 14290)}</p>
+          <p className="text-2xl font-bold text-neutral-900">{formatINR(paidRevenue)}</p>
           <p className="text-[11px] font-mono text-neutral-500 mt-1">On track</p>
         </div>
       </div>
@@ -253,7 +253,7 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-md bg-white h-screen shadow-xl flex flex-col p-6 overflow-y-auto"
+              className="relative w-full max-w-2xl bg-white h-screen shadow-xl flex flex-col p-6 overflow-y-auto"
             >
               <div className="flex justify-between items-center pb-4 border-b border-neutral-150">
                 <div className="flex flex-col">
@@ -300,8 +300,8 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
                 {/* Edit Payment Status */}
                 <div>
                   <label className="block text-xs text-neutral-500 font-mono mb-2">Payment Status</label>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    {(['Paid', 'Pending', 'Failed'] as const).map((status) => (
+                  <div className="grid grid-cols-4 gap-2 text-xs">
+                    {(['Paid', 'Pending', 'Failed', 'Refunded'] as const).map((status) => (
                       <button
                         key={status}
                         onClick={() => setEditPaymentStatus(status)}
@@ -321,7 +321,7 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
                 <div className="mt-2">
                   <label className="block text-xs text-neutral-500 font-mono mb-2">Fulfillment Status</label>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    {(['Processing', 'Confirmed', 'Shipped', 'Delivered'] as const).map((status) => (
+                    {(['Processing', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'] as const).map((status) => (
                       <button
                         key={status}
                         onClick={() => setEditFulfillmentStatus(status)}
@@ -336,36 +336,181 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
                     ))}
                   </div>
                 </div>
+
+                {editFulfillmentStatus === 'Shipped' && (
+                  <label className="mt-2 flex flex-col gap-1.5">
+                    <span className="text-xs text-neutral-500 font-mono">Tracking URL</span>
+                    <input
+                      type="url"
+                      value={editTrackingUrl}
+                      onChange={(event) => setEditTrackingUrl(event.target.value)}
+                      placeholder="https://shipper.example/track/ST-IN-1027"
+                      className="rounded-lg border border-neutral-200 p-2.5 font-mono text-[11px] outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                    />
+                  </label>
+                )}
               </div>
 
-              {/* Summary Items Mock Segment */}
+              {/* Invoice / bill segment - collapsible */}
               <div className="py-6 flex flex-col gap-4 flex-1">
-                <h5 className="text-[11px] font-semibold text-neutral-450 uppercase tracking-widest">Order Summary</h5>
-                {selectedOrderItems.map((item) => (
-                  <div key={item.sku} className="flex justify-between items-center text-xs pb-3 border-b border-dashed border-neutral-100">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-neutral-800">{item.name}</span>
-                      <span className="text-neutral-400 font-mono mt-0.5">SKU: {item.sku} x 1</span>
-                    </div>
-                    <span className="font-mono text-neutral-800">{formatINR(item.amount)}</span>
-                  </div>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => setShowInvoice(!showInvoice)}
+                  className="flex items-center justify-between rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-left transition hover:bg-neutral-100"
+                >
+                  <span className="flex items-center gap-2">
+                    <Receipt size={15} className="text-neutral-600" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-neutral-700">Tax Invoice</span>
+                  </span>
+                  <span className={`text-xs font-mono text-neutral-400 transition-transform ${showInvoice ? 'rotate-180' : ''}`}>▼</span>
+                </button>
 
-                <div className="flex flex-col gap-1.5 mt-auto bg-neutral-50/50 p-4 rounded-lg border border-neutral-100 text-xs">
-                  <div className="flex justify-between font-mono">
-                    <span className="text-neutral-400">Subtotal</span>
-                    <span className="text-neutral-800 font-semibold">{formatINR(selectedOrderSubtotal)}</span>
+                {showInvoice && <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xs">
+                  <div className="flex items-start justify-between gap-4 border-b border-neutral-200 bg-neutral-950 p-5 text-white">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg border border-white/15 bg-white/10 p-2.5">
+                        <Receipt size={20} />
+                      </div>
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/55">Tax invoice</p>
+                        <h5 className="mt-1 text-xl font-bold uppercase tracking-tight">STORY India Bill</h5>
+                        <p className="mt-2 font-mono text-[11px] text-white/65">Invoice No. {selectedOrder.id}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-white/80 transition hover:bg-white hover:text-neutral-950"
+                    >
+                      <Printer size={13} />
+                      Print
+                    </button>
                   </div>
-                  <div className="flex justify-between font-mono">
-                    <span className="text-neutral-400">GST (18%)</span>
-                    <span className="text-neutral-800 font-semibold">{formatINR(selectedOrderGst)}</span>
+
+                  <div className="grid grid-cols-1 gap-4 border-b border-neutral-100 p-5 text-xs md:grid-cols-3">
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">Bill To</p>
+                      <p className="mt-2 font-semibold text-neutral-950">{selectedOrder.customerName}</p>
+                      <p className="mt-1 break-all font-mono text-neutral-500">{selectedOrder.customerEmail || 'No email on order'}</p>
+                    </div>
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">Ship To</p>
+                      <p className="mt-2 font-semibold text-neutral-950">{selectedOrder.address?.fullName || selectedOrder.address?.name || selectedOrder.customerName}</p>
+                      <p className="mt-1 leading-5 text-neutral-500">
+                        {[selectedOrder.address?.street || selectedOrder.address?.line1, selectedOrder.address?.line2, selectedOrder.address?.city, selectedOrder.address?.country].filter(Boolean).join(', ') || 'Address not available'}
+                      </p>
+                      {selectedOrder.address?.phone && <p className="mt-1 font-mono text-neutral-500">{selectedOrder.address.phone}</p>}
+                    </div>
+                    <div>
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">Order Details</p>
+                      <div className="mt-2 space-y-1 font-mono text-neutral-600">
+                        <p>Date: {selectedOrder.date}</p>
+                        <p>Payment: {selectedOrder.paymentStatus}</p>
+                        <p>Fulfillment: {selectedOrder.fulfillmentStatus}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between font-sans pt-2 border-t border-neutral-200/50 text-sm font-bold text-neutral-900 mt-2">
-                    <span>Total Charged</span>
-                    <span className="font-mono">{formatINR(selectedOrder.amount)}</span>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-neutral-150 bg-neutral-50 font-mono text-[10px] uppercase tracking-wider text-neutral-400">
+                          <th className="p-3 font-semibold">Item</th>
+                          <th className="p-3 text-center font-semibold">Qty</th>
+                          <th className="p-3 text-right font-semibold">Rate</th>
+                          <th className="p-3 text-right font-semibold">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {selectedOrderItems.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="p-5 text-center text-neutral-500">No item rows were returned for this order.</td>
+                          </tr>
+                        ) : (
+                          selectedOrderItems.map((item) => (
+                            <tr key={item.id}>
+                              <td className="p-3">
+                                <div className="flex min-w-0 gap-3">
+                                  <div className="h-12 w-10 shrink-0 overflow-hidden rounded border border-neutral-200 bg-neutral-100">
+                                    {item.image ? (
+                                      <img src={item.image} alt="" className="h-full w-full object-cover grayscale" referrerPolicy="no-referrer" />
+                                    ) : null}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="truncate font-semibold text-neutral-900">{item.name}</p>
+                                    <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-neutral-400">
+                                      {[item.selectedSize, item.selectedColor?.name].filter(Boolean).join(' / ') || 'Standard'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3 text-center font-mono text-neutral-700">{item.quantity}</td>
+                              <td className="p-3 text-right font-mono text-neutral-700">{formatINR(item.price)}</td>
+                              <td className="p-3 text-right font-mono font-semibold text-neutral-900">{formatINR(item.subtotal)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
+
+                  <div className="grid grid-cols-1 gap-4 border-t border-neutral-150 bg-neutral-50/40 p-5 md:grid-cols-[1fr_260px]">
+                    <div className="rounded-lg border border-neutral-100 bg-white p-4 text-xs">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">Payment Reference</p>
+                      <div className="mt-2 space-y-1 font-mono text-neutral-600">
+                        <p>Method: {selectedOrder.paymentMethod || 'Razorpay'}</p>
+                        {selectedOrder.razorpayOrderId && <p>Razorpay Order: {selectedOrder.razorpayOrderId}</p>}
+                        {selectedOrder.razorpayPaymentId && <p>Payment ID: {selectedOrder.razorpayPaymentId}</p>}
+                        {selectedOrder.trackingUrl && <p className="break-all">Tracking: {selectedOrder.trackingUrl}</p>}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-neutral-100 bg-white p-4 text-xs">
+                      <div className="space-y-2">
+                        <div className="flex justify-between font-mono">
+                          <span className="text-neutral-400">Subtotal</span>
+                          <span className="font-semibold text-neutral-800">{formatINR(selectedOrderSubtotal)}</span>
+                        </div>
+                        <div className="flex justify-between font-mono">
+                          <span className="text-neutral-400">GST</span>
+                          <span className="font-semibold text-neutral-800">{formatINR(selectedOrderGst)}</span>
+                        </div>
+                        <div className="flex justify-between font-mono">
+                          <span className="text-neutral-400">Shipping</span>
+                          <span className="font-semibold text-neutral-800">{formatINR(selectedOrderShipping)}</span>
+                        </div>
+                        {selectedOrder.couponDiscount ? (
+                          <div className="flex justify-between font-mono">
+                            <span className="text-neutral-400">Coupon</span>
+                            <span className="font-semibold text-neutral-800">-{formatINR(selectedOrder.couponDiscount)}</span>
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex justify-between border-t border-neutral-200 pt-3 text-sm font-bold text-neutral-950">
+                          <span>Total</span>
+                          <span className="font-mono">{formatINR(selectedOrder.amount)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>}
               </div>
+
+              {/* Save success toast */}
+              <AnimatePresence>
+                {saveSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="fixed bottom-6 right-6 z-[60] flex items-center gap-2 rounded-lg border border-neutral-900 bg-neutral-950 px-5 py-3.5 text-white shadow-lg"
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5L4.5 8.5L9.5 3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </span>
+                    <span className="font-mono text-[11px] font-semibold uppercase tracking-wider">Changes saved successfully</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Keep changes CTA */}
               <div className="pt-4 border-t border-neutral-200 mt-4 flex gap-3">

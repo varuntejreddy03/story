@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Sparkles, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { X, Image as ImageIcon, Plus, Trash2, Upload } from 'lucide-react';
 import { Product, Category, Coupon } from '../types';
 
 // Hotlinked premium placeholder images for intuitive choices in modals
@@ -44,241 +44,499 @@ const categoryPresets = [
 ];
 
 /* -------------------------------------------
-   AddProductModal
+   Product Editor Modals
 ------------------------------------------- */
 interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (product: Omit<Product, 'id'>) => void;
+  categories: Category[];
 }
 
-export function AddProductModal({ isOpen, onClose, onAdd }: AddProductModalProps) {
-  const [name, setName] = useState('');
-  const [sku, setSku] = useState('');
-  const [category, setCategory] = useState('Dresses');
-  const [price, setPrice] = useState('');
-  const [stock, setStock] = useState('');
-  const [location, setLocation] = useState('Mumbai Hub');
-  const [imageUrl, setImageUrl] = useState(productPresets[0].url);
-  const [imageFile, setImageFile] = useState<File | undefined>();
+interface EditProductModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (productId: string, product: Partial<Product>) => void;
+  categories: Category[];
+  product: Product | null;
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onAdd({
-      name,
-      sku: sku || `DR-${Math.floor(100 + Math.random() * 900)}-XYZ`,
-      category,
-      price: Number(price) || 3490,
-      stock: Number(stock) || 10,
-      location,
-      image: imageUrl,
-      imageFile,
-      status: 'active'
-    });
-    // Reset states
-    setName('');
-    setSku('');
-    setPrice('');
-    setStock('');
-    setImageFile(undefined);
-    onClose();
+type ImageDraft = { file: File; preview: string };
+type ProductColor = { name: string; hex: string };
+type ProductDraft = {
+  name: string;
+  sku: string;
+  categoryId: string;
+  price: string;
+  originalPrice: string;
+  stock: string;
+  description: string;
+  composition: string;
+  care: string;
+  details: string[];
+  sizes: string[];
+  colors: ProductColor[];
+  images: string[];
+  imageFiles: ImageDraft[];
+  secondaryImage: string;
+  secondaryImageFile?: File;
+  status: Product['status'];
+};
+
+const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34', '36', '38', '40'];
+
+const makeSku = (name: string) => {
+  const prefix = (name || 'STORY').replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase() || 'STY';
+  return `${prefix}-${Math.floor(100 + Math.random() * 900)}-IN`;
+};
+
+const cleanList = (items: string[]) => items.map((item) => item.trim()).filter(Boolean);
+
+function ProductEditorModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  categories,
+  product,
+  mode
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (product: Omit<Product, 'id'> | Partial<Product>) => void;
+  categories: Category[];
+  product?: Product | null;
+  mode: 'create' | 'edit';
+}) {
+  const activeCategories = React.useMemo(
+    () => categories.filter((category) => category.status === 'Active' || category.id === product?.categoryId),
+    [categories, product?.categoryId]
+  );
+
+  const defaultDraft = React.useCallback((): ProductDraft => {
+    const imageList = product?.images?.length ? product.images : product?.image ? [product.image] : [productPresets[0].url];
+
+    return {
+      name: product?.name || '',
+      sku: product?.sku || '',
+      categoryId: product?.categoryId || activeCategories[0]?.id || '',
+      price: product?.price ? String(product.price) : '',
+      originalPrice: product?.originalPrice ? String(product.originalPrice) : '',
+      stock: product?.stock !== undefined ? String(product.stock) : '',
+      description: product?.description || '',
+      composition: product?.composition || '',
+      care: product?.care || '',
+      details: product?.details?.length ? product.details : [''],
+      sizes: product?.sizes?.length ? product.sizes : ['S', 'M', 'L'],
+      colors: product?.colors?.length ? product.colors : [{ name: 'Black', hex: '#111111' }],
+      images: imageList.filter(Boolean),
+      imageFiles: [],
+      secondaryImage: product?.secondaryImage || '',
+      status: product?.status || 'active'
+    };
+  }, [activeCategories, product]);
+
+  const [draft, setDraft] = useState<ProductDraft>(defaultDraft);
+
+  React.useEffect(() => {
+    if (isOpen) setDraft(defaultDraft());
+  }, [defaultDraft, isOpen]);
+
+  const selectedCategory = activeCategories.find((item) => item.id === draft.categoryId) || activeCategories[0];
+
+  const updateDetail = (index: number, value: string) => {
+    setDraft((current) => ({
+      ...current,
+      details: current.details.map((item, itemIndex) => (itemIndex === index ? value : item))
+    }));
+  };
+
+  const updateColor = (index: number, patch: Partial<ProductColor>) => {
+    setDraft((current) => ({
+      ...current,
+      colors: current.colors.map((color, colorIndex) => (colorIndex === index ? { ...color, ...patch } : color))
+    }));
+  };
+
+  const updateImage = (index: number, value: string) => {
+    setDraft((current) => ({
+      ...current,
+      images: current.images.map((image, imageIndex) => (imageIndex === index ? value : image))
+    }));
+  };
+
+  const removeImage = (image: string) => {
+    setDraft((current) => ({
+      ...current,
+      images: current.images.filter((item) => item !== image),
+      imageFiles: current.imageFiles.filter((item) => item.preview !== image)
+    }));
+  };
+
+  const toggleSize = (size: string) => {
+    setDraft((current) => ({
+      ...current,
+      sizes: current.sizes.includes(size)
+        ? current.sizes.filter((item) => item !== size)
+        : [...current.sizes, size]
+    }));
+  };
+
+  const handleImageFiles = (files: FileList | null) => {
+    if (!files?.length) return;
+    const nextFiles = Array.from(files).slice(0, 8).map((file) => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+
+    setDraft((current) => ({
+      ...current,
+      images: [...current.images, ...nextFiles.map((item) => item.preview)],
+      imageFiles: [...current.imageFiles, ...nextFiles]
+    }));
+  };
+
+  const handleSecondaryFile = (file?: File) => {
+    if (!file) return;
+    setDraft((current) => ({
+      ...current,
+      secondaryImage: URL.createObjectURL(file),
+      secondaryImageFile: file
+    }));
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const images = cleanList(draft.images);
+    const payload: Omit<Product, 'id'> | Partial<Product> = {
+      name: draft.name.trim(),
+      sku: draft.sku.trim() || makeSku(draft.name),
+      category: selectedCategory?.name || '',
+      categoryId: selectedCategory?.id,
+      price: Number(draft.price),
+      originalPrice: draft.originalPrice ? Number(draft.originalPrice) : undefined,
+      stock: Number(draft.stock),
+      image: images[0] || '',
+      images,
+      imageFiles: draft.imageFiles.map((item) => item.file),
+      secondaryImage: draft.secondaryImage,
+      secondaryImageFile: draft.secondaryImageFile,
+      description: draft.description,
+      composition: draft.composition,
+      care: draft.care,
+      details: cleanList(draft.details),
+      sizes: draft.sizes,
+      colors: draft.colors.filter((color) => color.name.trim() && color.hex.trim()),
+      status: draft.status
+    };
+
+    onSubmit(payload);
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="absolute inset-0 bg-black/45 backdrop-blur-xs"
           />
-          
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 15 }}
-            className="relative bg-white rounded-xl shadow-2xl border border-neutral-200/60 w-full max-w-lg overflow-hidden text-left flex flex-col max-h-[90vh]"
+            className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-neutral-200/60 bg-white text-left shadow-2xl"
           >
-            <div className="p-5 border-b border-neutral-150 flex justify-between items-center bg-neutral-50/20">
-              <h3 className="font-bold font-sans text-neutral-900 text-base">Register New Product</h3>
-              <button onClick={onClose} className="p-1 text-neutral-400 hover:text-black hover:bg-neutral-100 rounded-full transition-all">
+            <div className="flex items-center justify-between border-b border-neutral-150 bg-neutral-50/20 p-5">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">{mode === 'create' ? 'New catalog item' : 'Edit catalog item'}</p>
+                <h3 className="mt-1 font-sans text-base font-bold text-neutral-900">{mode === 'create' ? 'Register Product' : draft.name || 'Edit Product'}</h3>
+              </div>
+              <button onClick={onClose} className="rounded-full p-1 text-neutral-400 transition-all hover:bg-neutral-100 hover:text-black">
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 flex-1 overflow-y-auto flex flex-col gap-5 text-xs font-sans">
-              
-              <div className="flex flex-col gap-1.5">
-                <label className="font-semibold text-neutral-700">Product Title</label>
-                <input 
-                  type="text"
-                  value={name}
-                  onChange={e => {
-                    setName(e.target.value);
-                    if(!sku) {
-                      const prefix = e.target.value.substring(0, 3).toUpperCase();
-                      setSku(`${prefix}-${Math.floor(100 + Math.random() * 900)}-XYZ`);
-                    }
-                  }}
-                  placeholder="e.g. Relaxed Linen Shirt"
-                  className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 text-sm"
-                  required
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 text-xs font-sans lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="flex flex-col gap-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-1.5 md:col-span-2">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Name</span>
+                    <input
+                      type="text"
+                      value={draft.name}
+                      onChange={event => setDraft({ ...draft, name: event.target.value, sku: draft.sku || makeSku(event.target.value) })}
+                      className="rounded-lg border border-neutral-200 p-2.5 text-sm outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                      placeholder="Relaxed Linen Shirt"
+                      required
+                    />
+                  </label>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-neutral-700">SKU Code</label>
-                  <input 
-                    type="text"
-                    value={sku}
-                    onChange={e => setSku(e.target.value)}
-                    placeholder="e.g. BL-204-SLK"
-                    className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono"
-                    required
-                  />
-                </div>
-                
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-neutral-700">Category Tag</label>
-                  <select 
-                    value={category}
-                    onChange={e => setCategory(e.target.value)}
-                    className="p-2.5 bg-white border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
-                  >
-                    <option value="Outerwear">Outerwear</option>
-                    <option value="New Arrival">New Arrival</option>
-                    <option value="Bottom">Bottom</option>
-                    <option value="Dresses">Dresses</option>
-                    <option value="Accessory">Accessory</option>
-                    <option value="Shoes">Shoes</option>
-                    <option value="Top">Top</option>
-                    <option value="Sale">Sale</option>
-                    <option value="Featured">Featured</option>
-                  </select>
-                </div>
-              </div>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">SKU</span>
+                    <input
+                      type="text"
+                      value={draft.sku}
+                      onChange={event => setDraft({ ...draft, sku: event.target.value })}
+                      className="rounded-lg border border-neutral-200 p-2.5 font-mono outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                      placeholder="TOP-449-LIN"
+                    />
+                  </label>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-neutral-700">Price (INR)</label>
-                  <input 
-                    type="number"
-                    value={price}
-                    onChange={e => setPrice(e.target.value)}
-                    placeholder="3490"
-                    className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-neutral-700">Initial Stock</label>
-                  <input 
-                    type="number"
-                    value={stock}
-                    onChange={e => setStock(e.target.value)}
-                    placeholder="15"
-                    className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-neutral-700">Warehouse Region</label>
-                  <select 
-                    value={location}
-                    onChange={e => setLocation(e.target.value)}
-                    className="p-2.5 bg-white border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
-                  >
-                    <option value="Mumbai Hub">Mumbai Hub</option>
-                    <option value="Delhi Hub">Delhi Hub</option>
-                    <option value="Bengaluru Hub">Bengaluru Hub</option>
-                    <option value="Jaipur Studio">Jaipur Studio</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Presets and manual input URL option */}
-              <div className="flex flex-col gap-3.5 border-t border-neutral-100 pt-4">
-                <div className="flex justify-between items-center">
-                  <label className="font-semibold text-neutral-700">Design Visual Preset Source</label>
-                  <span className="text-[10px] text-neutral-400">Select curated luxury preview</span>
-                </div>
-                
-                <div className="grid grid-cols-4 gap-2">
-                  {productPresets.map((preset) => (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      onClick={() => {
-                        setImageFile(undefined);
-                        setImageUrl(preset.url);
-                      }}
-                      className={`h-14 rounded-lg overflow-hidden border relative flex items-center justify-center bg-neutral-100 ${
-                        imageUrl === preset.url ? 'border-black ring-1 ring-black' : 'border-neutral-200 hover:border-neutral-350'
-                      }`}
+                  <label className="flex flex-col gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Category</span>
+                    <select
+                      value={draft.categoryId}
+                      onChange={event => setDraft({ ...draft, categoryId: event.target.value })}
+                      className="rounded-lg border border-neutral-200 bg-white p-2.5 outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                      required
                     >
-                      <img src={preset.url} alt={preset.name} className="object-cover w-full h-full grayscale" referrerPolicy="no-referrer" />
+                      {activeCategories.length === 0 ? (
+                        <option value="">Create a category first</option>
+                      ) : (
+                        activeCategories.map((categoryItem) => (
+                          <option key={categoryItem.id} value={categoryItem.id}>{categoryItem.name}</option>
+                        ))
+                      )}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Selling Price</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={draft.price}
+                      onChange={event => setDraft({ ...draft, price: event.target.value })}
+                      className="rounded-lg border border-neutral-200 p-2.5 font-mono outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                      required
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Original Price</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={draft.originalPrice}
+                      onChange={event => setDraft({ ...draft, originalPrice: event.target.value })}
+                      className="rounded-lg border border-neutral-200 p-2.5 font-mono outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                      placeholder="Optional MRP"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Stock</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={draft.stock}
+                      onChange={event => setDraft({ ...draft, stock: event.target.value })}
+                      className="rounded-lg border border-neutral-200 p-2.5 font-mono outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                      required
+                    />
+                  </label>
+
+                </div>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Description</span>
+                  <textarea
+                    value={draft.description}
+                    onChange={event => setDraft({ ...draft, description: event.target.value })}
+                    rows={4}
+                    className="resize-none rounded-lg border border-neutral-200 p-2.5 leading-relaxed outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                  />
+                </label>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Composition</span>
+                    <input
+                      value={draft.composition}
+                      onChange={event => setDraft({ ...draft, composition: event.target.value })}
+                      className="rounded-lg border border-neutral-200 p-2.5 outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                      placeholder="90% organic cotton, 10% linen"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Care</span>
+                    <input
+                      value={draft.care}
+                      onChange={event => setDraft({ ...draft, care: event.target.value })}
+                      className="rounded-lg border border-neutral-200 p-2.5 outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                      placeholder="Dry clean only"
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Details</span>
+                    <button type="button" onClick={() => setDraft({ ...draft, details: [...draft.details, ''] })} className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-neutral-600 hover:text-neutral-950">
+                      <Plus size={12} /> Add
                     </button>
+                  </div>
+                  {draft.details.map((detail, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        value={detail}
+                        onChange={event => updateDetail(index, event.target.value)}
+                        className="flex-1 rounded-lg border border-neutral-200 p-2.5 outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
+                        placeholder="High waist"
+                      />
+                      <button type="button" onClick={() => setDraft({ ...draft, details: draft.details.filter((_, itemIndex) => itemIndex !== index) })} className="rounded-lg border border-neutral-200 p-2 text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Status</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['active', 'draft'] as const).map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setDraft({ ...draft, status })}
+                        className={`rounded-lg border px-3 py-2 font-mono text-[10px] uppercase tracking-widest transition ${draft.status === status ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 text-neutral-600 hover:border-neutral-950'}`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Sizes</span>
+                  <div className="flex flex-wrap gap-2">
+                    {sizeOptions.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => toggleSize(size)}
+                        className={`h-8 min-w-10 rounded-lg border px-2 font-mono text-[10px] uppercase tracking-widest transition ${draft.sizes.includes(size) ? 'border-neutral-950 bg-neutral-950 text-white' : 'border-neutral-200 text-neutral-600 hover:border-neutral-950'}`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Colors</span>
+                    <button type="button" onClick={() => setDraft({ ...draft, colors: [...draft.colors, { name: '', hex: '#111111' }] })} className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-neutral-600 hover:text-neutral-950">
+                      <Plus size={12} /> Add
+                    </button>
+                  </div>
+                  {draft.colors.map((color, index) => (
+                    <div key={index} className="grid grid-cols-[42px_1fr_42px] gap-2">
+                      <input type="color" value={color.hex || '#111111'} onChange={event => updateColor(index, { hex: event.target.value })} className="h-10 w-10 rounded border border-neutral-200 bg-white p-1" />
+                      <input value={color.name} onChange={event => updateColor(index, { name: event.target.value })} className="rounded-lg border border-neutral-200 p-2.5 outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" placeholder="Off-White" />
+                      <button type="button" onClick={() => setDraft({ ...draft, colors: draft.colors.filter((_, colorIndex) => colorIndex !== index) })} className="rounded-lg border border-neutral-200 p-2 text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   ))}
                 </div>
 
-                <div className="flex flex-col gap-1.5 mt-1">
-                  <label className="font-semibold text-neutral-500">Upload to backend folder</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      setImageFile(file);
-                      setImageUrl(URL.createObjectURL(file));
-                    }}
-                    className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 text-[11px]"
-                  />
+                <div className="flex flex-col gap-3 border-t border-neutral-100 pt-4">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Images</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {productPresets.map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => setDraft({ ...draft, images: [preset.url, ...draft.images.filter((image) => image !== preset.url)] })}
+                        className="h-14 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 hover:border-neutral-950"
+                        title={preset.name}
+                      >
+                        <img src={preset.url} alt={preset.name} className="h-full w-full object-cover grayscale" referrerPolicy="no-referrer" />
+                      </button>
+                    ))}
+                  </div>
+
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-300 p-3 font-mono text-[10px] uppercase tracking-widest text-neutral-500 hover:border-neutral-950 hover:text-neutral-950">
+                    <Upload size={14} />
+                    Upload Images
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={event => handleImageFiles(event.target.files)} />
+                  </label>
+
+                  <div className="flex flex-col gap-2">
+                    {draft.images.map((image, index) => (
+                      <div key={`${image}-${index}`} className="flex items-center gap-2">
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded border border-neutral-200 bg-neutral-100">
+                          {image ? <img alt="" className="h-full w-full object-cover" src={image} referrerPolicy="no-referrer" /> : <ImageIcon size={14} className="m-3 text-neutral-300" />}
+                        </div>
+                        <input value={image} onChange={event => updateImage(index, event.target.value)} className="min-w-0 flex-1 rounded-lg border border-neutral-200 p-2 font-mono text-[11px] outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" placeholder="https://..." />
+                        <button type="button" onClick={() => removeImage(image)} className="rounded-lg border border-neutral-200 p-2 text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setDraft({ ...draft, images: [...draft.images, ''] })} className="inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-200 py-2 font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:border-neutral-950 hover:text-neutral-950">
+                      <Plus size={13} /> Add URL
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5 mt-1">
-                  <label className="font-semibold text-neutral-500">Or Manual Image HTTP/HTTPS Link URL</label>
-                  <input 
-                    type="url"
-                    value={imageUrl}
-                    onChange={e => {
-                      setImageFile(undefined);
-                      setImageUrl(e.target.value);
-                    }}
-                    className="p-2.5 border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono text-[11px]"
-                    placeholder="https://..."
-                    required
-                  />
+                <div className="flex flex-col gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Secondary Image</span>
+                  <input value={draft.secondaryImage} onChange={event => setDraft({ ...draft, secondaryImage: event.target.value, secondaryImageFile: undefined })} className="rounded-lg border border-neutral-200 p-2.5 font-mono text-[11px] outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" placeholder="https://..." />
+                  <input type="file" accept="image/*" onChange={event => handleSecondaryFile(event.target.files?.[0])} className="rounded-lg border border-neutral-200 p-2.5 text-[11px] outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
+                </div>
+
+                <div className="mt-auto flex gap-3 border-t border-neutral-150 pt-4">
+                  <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-neutral-250 py-3 text-center text-xs font-semibold uppercase tracking-wider transition-colors hover:bg-neutral-50">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={activeCategories.length === 0} className="flex-1 rounded-lg bg-black py-3 text-center text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-neutral-850 disabled:cursor-not-allowed disabled:opacity-50">
+                    {mode === 'create' ? 'Register Item' : 'Save Product'}
+                  </button>
                 </div>
               </div>
-
-              <div className="pt-4 border-t border-neutral-150 mt-4 flex gap-3">
-                <button 
-                  type="button" 
-                  onClick={onClose} 
-                  className="flex-1 border border-neutral-250 py-3 rounded-lg text-xs font-semibold hover:bg-neutral-50 transition-colors uppercase tracking-wider text-center"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="flex-1 bg-black text-white hover:bg-neutral-850 py-3 rounded-lg text-xs font-semibold transition-colors uppercase tracking-wider text-center"
-                >
-                  Register Item
-                </button>
-              </div>
-
             </form>
           </motion.div>
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+export function AddProductModal({ isOpen, onClose, onAdd, categories }: AddProductModalProps) {
+  return (
+    <ProductEditorModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={(product) => {
+        onAdd(product as Omit<Product, 'id'>);
+        onClose();
+      }}
+      categories={categories}
+      mode="create"
+    />
+  );
+}
+
+export function EditProductModal({ isOpen, onClose, onSave, categories, product }: EditProductModalProps) {
+  return (
+    <ProductEditorModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onSubmit={(patch) => {
+        if (product) onSave(product.id, patch);
+      }}
+      categories={categories}
+      product={product}
+      mode="edit"
+    />
   );
 }
 
@@ -293,8 +551,7 @@ interface AddCategoryModalProps {
 
 export function AddCategoryModal({ isOpen, onClose, onAdd }: AddCategoryModalProps) {
   const [name, setName] = useState('');
-  const [parent, setParent] = useState('None');
-  const [isDynamic, setIsDynamic] = useState(false);
+
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState(categoryPresets[0].url);
   const [imageFile, setImageFile] = useState<File | undefined>();
@@ -303,8 +560,8 @@ export function AddCategoryModal({ isOpen, onClose, onAdd }: AddCategoryModalPro
     e.preventDefault();
     onAdd({
       name,
-      parent,
-      isDynamic,
+      parent: 'None',
+      isDynamic: false,
       description: description || 'No summary description.',
       image: imageUrl,
       imageFile,
@@ -355,41 +612,7 @@ export function AddCategoryModal({ isOpen, onClose, onAdd }: AddCategoryModalPro
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-neutral-700">Hierarchy Parent Group</label>
-                  <select 
-                    value={parent}
-                    onChange={e => setParent(e.target.value)}
-                    className="p-2.5 bg-white border border-neutral-200 rounded-lg outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900"
-                  >
-                    <option value="None">None (Root)</option>
-                    <option value="Outerwear">Outerwear</option>
-                    <option value="Accessory">Accessory</option>
-                  </select>
-                </div>
 
-                {/* Toggle dynamic switch */}
-                <div className="flex flex-col gap-1.5 justify-center">
-                  <span className="font-semibold text-neutral-700">Dynamic collection model</span>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsDynamic(!isDynamic)}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                        isDynamic ? 'bg-black' : 'bg-neutral-200'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
-                          isDynamic ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                    <span className="text-[10px] text-neutral-500 font-mono">Auto Ingestion</span>
-                  </div>
-                </div>
-              </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-semibold text-neutral-700">Brief catalog description</label>

@@ -1,7 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/db.js';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAdminAuth } from '../../middleware/auth.js';
 import { upload } from '../../middleware/upload.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
@@ -16,7 +16,7 @@ export const adminCategoriesRouter = express.Router();
 const bodySchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().default(''),
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z.string().optional().nullable(),
   isActive: z.coerce.boolean().optional().default(true),
   sortOrder: z.coerce.number().int().optional().default(0),
   isDynamic: z.coerce.boolean().optional().default(false),
@@ -54,11 +54,10 @@ categoriesRouter.get('/:slug', asyncHandler(async (req, res) => {
   });
 }));
 
-adminCategoriesRouter.use(requireAuth, requireAdmin);
+adminCategoriesRouter.use(requireAdminAuth);
 
 adminCategoriesRouter.get('/', asyncHandler(async (_req, res) => {
   const categories = await prisma.category.findMany({
-    where: { isActive: true },
     include: { _count: { select: { products: true } } },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }]
   });

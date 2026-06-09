@@ -15,6 +15,7 @@ export const serializeCategory = (category) => ({
 
 export const serializeProduct = (product) => {
   const images = product.images || [];
+  const sellingPrice = product.discountedPrice || product.price;
   return {
     id: product.id,
     name: product.name,
@@ -27,12 +28,12 @@ export const serializeProduct = (product) => {
     secondaryImage: product.secondaryImage || images[1],
     listImages: images,
     description: product.description,
-    details: product.details || [],
+    details: Array.isArray(product.details) ? product.details : [],
     composition: product.composition,
     care: product.care,
-    sizes: product.sizes || ['S', 'M', 'L'],
-    colors: product.colors || [{ name: 'Black', hex: '#111111' }],
-    price: toNumber(product.discountedPrice || product.price),
+    sizes: Array.isArray(product.sizes) ? product.sizes : ['S', 'M', 'L'],
+    colors: Array.isArray(product.colors) ? product.colors : [{ name: 'Black', hex: '#111111' }],
+    price: toNumber(sellingPrice),
     originalPrice: product.discountedPrice ? toNumber(product.price) : undefined,
     stock: product.stock,
     status: product.isActive ? 'active' : 'draft',
@@ -105,7 +106,15 @@ export const serializeOrder = (order) => ({
   couponDiscount: toNumber(order.couponDiscount),
   trackingUrl: order.trackingUrl,
   address: order.addressSnapshot,
-  paymentMethod: order.paymentStatus === 'paid' ? 'UPI / RuPay verified' : 'Razorpay pending',
+  customerName: order.user
+    ? `${order.user.firstName}${order.user.lastName ? ` ${order.user.lastName}` : ''}`
+    : order.addressSnapshot?.fullName || order.addressSnapshot?.name || 'STORY Client',
+  customerEmail: order.user?.email || '',
+  razorpayOrderId: order.razorpayOrderId,
+  razorpayPaymentId: order.razorpayPaymentId,
+  paymentMethod: order.razorpayOrderId
+    ? order.paymentStatus === 'paid' ? 'Online payment verified' : 'Online payment pending'
+    : 'Pay on delivery',
   items: (order.items || []).map((item) => ({
     id: item.id,
     name: item.name,

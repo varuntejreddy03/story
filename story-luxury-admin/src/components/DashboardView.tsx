@@ -4,9 +4,10 @@
  */
 
 import { motion } from 'motion/react';
-import { TrendingUp, ArrowUpRight, AlertTriangle, Play, Settings2, Plus, Percent, CreditCard, FolderPlus, FileSpreadsheet } from 'lucide-react';
+import { TrendingUp, Settings2, Plus, Percent, FolderPlus } from 'lucide-react';
 import { Product, Order } from '../types';
 import { formatINR } from '../utils/currency';
+import { DashboardStats } from '../api';
 
 interface DashboardViewProps {
   products: Product[];
@@ -15,7 +16,32 @@ interface DashboardViewProps {
   onOpenAddProduct: () => void;
   onOpenAddCategory: () => void;
   onOpenCreateCoupon: () => void;
+  stats?: DashboardStats | null;
 }
+
+const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
+
+const statusOrder = ['Delivered', 'Shipped', 'Processing', 'Confirmed', 'Pending', 'Cancelled'];
+const statusMeta: Record<string, { stroke: string; dotClass: string }> = {
+  Delivered: { stroke: '#111111', dotClass: 'bg-black' },
+  Shipped: { stroke: '#737373', dotClass: 'bg-neutral-500' },
+  Processing: { stroke: '#d4d4d4', dotClass: 'bg-neutral-300' },
+  Confirmed: { stroke: '#525252', dotClass: 'bg-neutral-700' },
+  Pending: { stroke: '#f59e0b', dotClass: 'bg-amber-500' },
+  Cancelled: { stroke: '#ef4444', dotClass: 'bg-red-500' }
+};
+
+const parseOrderDate = (value: string) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const roundedChartMax = (value: number) => {
+  if (value <= 0) return 1000;
+  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 1);
+  return Math.ceil(value / magnitude) * magnitude;
+};
 
 export default function DashboardView({
   products,
@@ -23,33 +49,56 @@ export default function DashboardView({
   onNavigate,
   onOpenAddProduct,
   onOpenAddCategory,
-  onOpenCreateCoupon
+  onOpenCreateCoupon,
+  stats
 }: DashboardViewProps) {
-  // Compute some stats
-  const totalRevenue = orders
-    .filter(o => o.paymentStatus === 'Paid')
-    .reduce((acc, curr) => acc + curr.amount, 0);
+  const paidOrders = orders.filter(o => o.paymentStatus === 'Paid');
+  const fallbackRevenue = paidOrders.reduce((acc, curr) => acc + curr.amount, 0);
 
-  const totalOrdersCount = orders.length;
-  const pendingOrdersCount = orders.filter(o => o.fulfillmentStatus === 'Processing' || o.fulfillmentStatus === 'Confirmed').length;
-  const lowStockCount = products.filter(p => p.stock <= 5).length;
-
-  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock <= 5);
+  const totalOrdersCount = stats?.orders.total ?? orders.length;
+  const lowStockCount = stats?.lowStockProducts ?? products.filter(p => p.stock < 5).length;
+  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock < 5);
   const bestSellers = products.slice(0, 2); // default best sellers for this demo
+  const recentOrders = stats?.recentOrders?.length ? stats.recentOrders : orders.slice(0, 5);
 
-  // Simple pure SVG Chart coordinates for luxury line chart (Revenue Overview)
-  const chartPoints = [
-    { label: 'Jan', val: 70 },
-    { label: 'Feb', val: 110 },
-    { label: 'Mar', val: 95 },
-    { label: 'Apr', val: 145 },
-    { label: 'May', val: 130 },
-    { label: 'Jun', val: 195 },
-    { label: 'Jul', val: 180 },
-    { label: 'Aug', val: 248 }
+  const statCards = [
+    { label: 'Revenue Today', value: formatINR(stats?.revenue.today ?? 0), action: 'Payments' },
+    { label: 'Revenue Month', value: formatINR(stats?.revenue.month ?? fallbackRevenue), action: 'Payments' },
+    { label: 'Revenue All Time', value: formatINR(stats?.revenue.allTime ?? fallbackRevenue), action: 'Payments' },
+    { label: 'Orders Total', value: totalOrdersCount.toLocaleString(), action: 'Orders' },
+    { label: 'Orders Today', value: String(stats?.orders.today ?? 0), action: 'Orders' },
+    { label: 'Orders Month', value: String(stats?.orders.month ?? orders.length), action: 'Orders' },
+    { label: 'Products', value: String(stats?.products ?? products.length), action: 'Products' },
+    { label: 'Low Stock', value: String(lowStockCount), action: 'Inventory' }
   ];
 
-  const maxVal = 300;
+  const revenueMonths = Array.from({ length: 8 }, (_, index) => {
+    const date = new Date();
+    date.setDate(1);
+    date.setMonth(date.getMonth() - (7 - index));
+    return {
+      key: `${date.getFullYear()}-${date.getMonth()}`,
+      label: monthFormatter.format(date),
+      month: date.getMonth(),
+      year: date.getFullYear()
+    };
+  });
+
+  const revenueByMonth = paidOrders.reduce<Record<string, number>>((acc, order) => {
+    const date = parseOrderDate(order.date);
+    if (!date) return acc;
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    acc[key] = (acc[key] || 0) + order.amount;
+    return acc;
+  }, {});
+
+  const chartPoints = revenueMonths.map(month => ({
+    label: month.label,
+    val: revenueByMonth[month.key] || 0
+  }));
+  const peakRevenue = Math.max(...chartPoints.map(point => point.val), 0);
+  const maxVal = roundedChartMax(peakRevenue);
+  const midVal = Math.round(maxVal / 2);
   const svgWidth = 500;
   const svgHeight = 150;
   const pointsString = chartPoints.map((p, i) => {
@@ -57,6 +106,37 @@ export default function DashboardView({
     const y = svgHeight - (p.val / maxVal) * svgHeight;
     return `${x},${y}`;
   }).join(' ');
+
+  const statusCounts = orders.reduce<Record<string, number>>((acc, order) => {
+    const status = order.fulfillmentStatus || 'Pending';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+  const orderedStatusItems = statusOrder
+    .filter(status => statusCounts[status])
+    .map(status => ({
+      label: status,
+      count: statusCounts[status],
+      percentage: orders.length ? (statusCounts[status] / orders.length) * 100 : 0,
+      ...statusMeta[status]
+    }));
+  const extraStatusItems = Object.entries(statusCounts)
+    .filter(([status]) => !statusMeta[status])
+    .map(([status, count]) => ({
+      label: status,
+      count,
+      percentage: orders.length ? (count / orders.length) * 100 : 0,
+      stroke: '#a3a3a3',
+      dotClass: 'bg-neutral-400'
+    }));
+  const orderStatusItems = [...orderedStatusItems, ...extraStatusItems];
+  let donutOffset = 0;
+  const donutSegments = orderStatusItems.map(item => {
+    const segment = { ...item, offset: donutOffset };
+    donutOffset += item.percentage;
+    return segment;
+  });
+  const deliveredPercent = orders.length ? Math.round(((statusCounts.Delivered || 0) / orders.length) * 100) : 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -74,70 +154,25 @@ export default function DashboardView({
       </div>
 
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Revenue */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="bg-white p-5 rounded-xl border border-neutral-150 shadow-xs flex flex-col gap-2 relative overflow-hidden group hover:border-neutral-300 transition-all cursor-pointer"
-          onClick={() => onNavigate('Payments')}
-        >
-          <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">Total Revenue</div>
-          <div className="text-2xl font-semibold text-neutral-900">{formatINR(totalRevenue + 248500)}</div>
-          <div className="text-xs text-neutral-500 flex items-center gap-1 font-mono">
-            <TrendingUp size={14} className="text-neutral-900" />
-            <span>+12.5% growth</span>
-          </div>
-        </motion.div>
-
-        {/* Total Orders */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.05 }}
-          className="bg-white p-5 rounded-xl border border-neutral-150 shadow-xs flex flex-col gap-2 hover:border-neutral-300 transition-all cursor-pointer"
-          onClick={() => onNavigate('Orders')}
-        >
-          <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">Total Orders</div>
-          <div className="text-2xl font-semibold text-neutral-900">{(totalOrdersCount + 1248).toLocaleString()}</div>
-          <div className="text-xs text-neutral-500 flex items-center gap-1 font-mono">
-            <TrendingUp size={14} className="text-neutral-900" />
-            <span>+8.2% growth</span>
-          </div>
-        </motion.div>
-
-        {/* Pending Orders */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="bg-white p-5 rounded-xl border border-neutral-150 shadow-xs flex flex-col gap-2 hover:border-neutral-300 transition-all cursor-pointer"
-          onClick={() => onNavigate('Orders')}
-        >
-          <div className="flex justify-between items-start">
-            <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">Pending Orders</div>
-            <span className="w-1.5 h-1.5 rounded-full bg-neutral-400"></span>
-          </div>
-          <div className="text-2xl font-semibold text-neutral-900">{pendingOrdersCount + 36}</div>
-          <div className="text-xs text-neutral-500 font-mono">Requires action</div>
-        </motion.div>
-
-        {/* Low Stock count */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.15 }}
-          className="bg-white p-5 rounded-xl border border-neutral-150 shadow-xs flex flex-col gap-2 hover:border-neutral-300 transition-all cursor-pointer"
-          onClick={() => onNavigate('Inventory')}
-        >
-          <div className="flex justify-between items-start">
-            <div className="text-[11px] font-semibold text-neutral-400 uppercase tracking-widest">Low Stock</div>
-            <span className="w-1.5 h-1.5 rounded-full bg-neutral-900"></span>
-          </div>
-          <div className="text-2xl font-semibold text-neutral-900">{lowStockCount + 12}</div>
-          <div className="text-xs text-neutral-500 font-mono">Items need restock</div>
-        </motion.div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {statCards.map((card, index) => (
+          <motion.button
+            key={card.label}
+            type="button"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, delay: index * 0.03 }}
+            className="rounded-xl border border-neutral-150 bg-white p-5 text-left shadow-xs transition-all hover:border-neutral-300"
+            onClick={() => onNavigate(card.action)}
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">{card.label}</div>
+            <div className="mt-2 text-2xl font-semibold text-neutral-900">{card.value}</div>
+            <div className="mt-2 flex items-center gap-1 font-mono text-xs text-neutral-500">
+              <TrendingUp size={14} className="text-neutral-900" />
+              <span>Live database value</span>
+            </div>
+          </motion.button>
+        ))}
       </div>
 
       {/* Bento Grid Layout */}
@@ -153,12 +188,12 @@ export default function DashboardView({
             <div className="bg-white p-5 rounded-xl border border-neutral-200/60 flex flex-col h-64 shadow-xs">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-semibold text-neutral-900">Revenue Overview</h3>
-                <span className="text-xs text-neutral-400 font-mono">{formatINR(248500)} peak</span>
+                <span className="text-xs text-neutral-400 font-mono">{formatINR(peakRevenue)} peak</span>
               </div>
               <div className="flex-1 bg-neutral-50/50 rounded-lg p-2 flex flex-col justify-between border border-neutral-100 relative overflow-hidden">
                 <div className="w-full h-full absolute inset-0 flex flex-col justify-between pointer-events-none p-4 opacity-35 font-mono text-[10px] text-neutral-400">
-                  <div className="border-b border-dashed border-neutral-200 w-full pb-1">{formatINR(300000)}</div>
-                  <div className="border-b border-dashed border-neutral-200 w-full pb-1">{formatINR(150000)}</div>
+                  <div className="border-b border-dashed border-neutral-200 w-full pb-1">{formatINR(maxVal)}</div>
+                  <div className="border-b border-dashed border-neutral-200 w-full pb-1">{formatINR(midVal)}</div>
                   <div className="w-full">{formatINR(0)}</div>
                 </div>
                 {/* SVG Graph */}
@@ -210,7 +245,7 @@ export default function DashboardView({
               </div>
             </div>
 
-            {/* Order Status Donut Chart (Simulated beautifully) */}
+            {/* Order Status Donut Chart */}
             <div className="bg-white p-5 rounded-xl border border-neutral-200/60 flex flex-col h-64 shadow-xs">
               <h3 className="text-sm font-semibold text-neutral-900 mb-4">Order Status</h3>
               <div className="flex-1 bg-neutral-50/50 rounded-lg p-3 flex items-center justify-between border border-neutral-100">
@@ -219,44 +254,40 @@ export default function DashboardView({
                   <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                     {/* Background Circle */}
                     <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f1f1f1" strokeWidth="3" />
-                    {/* Delivered Part (65%) */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#000000" strokeWidth="3" 
-                      strokeDasharray="65 100" strokeDashoffset="0" />
-                    {/* Shipped Part (25%) */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#7e7576" strokeWidth="3" 
-                      strokeDasharray="25 100" strokeDashoffset="-65" />
-                    {/* Pending Part (10%) */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#cfc4c5" strokeWidth="3" 
-                      strokeDasharray="10 100" strokeDashoffset="-90" />
+                    {donutSegments.map(segment => (
+                      <circle
+                        key={segment.label}
+                        cx="18"
+                        cy="18"
+                        r="15.915"
+                        fill="none"
+                        stroke={segment.stroke}
+                        strokeWidth="3"
+                        strokeDasharray={`${segment.percentage} ${100 - segment.percentage}`}
+                        strokeDashoffset={-segment.offset}
+                      />
+                    ))}
                   </svg>
                   <div className="absolute flex flex-col items-center">
-                    <span className="text-xl font-bold font-sans text-neutral-900">88%</span>
-                    <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-semibold">Fulfillment</span>
+                    <span className="text-xl font-bold font-sans text-neutral-900">{deliveredPercent}%</span>
+                    <span className="text-[9px] text-neutral-400 uppercase tracking-wider font-semibold">Delivered</span>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2.5 pr-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-black"></span>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-medium text-neutral-700">Delivered</span>
-                      <span className="text-[10px] text-neutral-400 font-mono">65% of orders</span>
+                <div className="flex flex-col gap-2 pr-2">
+                  {orderStatusItems.length === 0 ? (
+                    <div className="text-xs text-neutral-400">No orders yet.</div>
+                  ) : orderStatusItems.map(item => (
+                    <div key={item.label} className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${item.dotClass}`}></span>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-medium text-neutral-700">{item.label}</span>
+                        <span className="text-[10px] text-neutral-400 font-mono">
+                          {item.count} orders · {Math.round(item.percentage)}%
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-500"></span>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-medium text-neutral-700">Shipped</span>
-                      <span className="text-[10px] text-neutral-400 font-mono">25% of orders</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-300"></span>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-medium text-neutral-700">Processing</span>
-                      <span className="text-[10px] text-neutral-400 font-mono">10% of orders</span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -286,7 +317,7 @@ export default function DashboardView({
                   </tr>
                 </thead>
                 <tbody className="text-xs divide-y divide-neutral-100 font-sans text-neutral-800">
-                  {orders.slice(0, 3).map((order) => (
+                  {recentOrders.slice(0, 5).map((order) => (
                     <tr key={order.id} className="hover:bg-neutral-50/40 transition-colors">
                       <td className="py-4 px-5 font-mono text-neutral-900">{order.id}</td>
                       <td className="py-4 px-5 font-medium text-neutral-900">{order.customerName}</td>

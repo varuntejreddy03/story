@@ -20,8 +20,27 @@ export const setAuthCookie = (res, token) => {
   });
 };
 
+export const setAdminAuthCookie = (res, token) => {
+  res.cookie('admin_token', token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    domain: env.cookieDomain,
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
+};
+
 export const clearAuthCookie = (res) => {
   res.clearCookie('token', {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    domain: env.cookieDomain
+  });
+};
+
+export const clearAdminAuthCookie = (res) => {
+  res.clearCookie('admin_token', {
     httpOnly: true,
     secure: isProduction,
     sameSite: 'lax',
@@ -35,9 +54,11 @@ const getToken = (req) => {
   return req.cookies?.token;
 };
 
-export const requireAuth = async (req, _res, next) => {
+const getAdminToken = (req) => req.cookies?.admin_token;
+
+const requireSession = (tokenGetter) => async (req, _res, next) => {
   try {
-    const token = getToken(req);
+    const token = tokenGetter(req);
     if (!token) throw new ApiError(401, 'Not authenticated');
 
     const payload = jwt.verify(token, env.jwtSecret);
@@ -51,6 +72,8 @@ export const requireAuth = async (req, _res, next) => {
   }
 };
 
+export const requireAuth = requireSession(getToken);
+
 export const requireAdmin = (req, _res, next) => {
   if (req.user?.role !== 'admin') {
     next(new ApiError(403, 'Admin access required'));
@@ -58,3 +81,5 @@ export const requireAdmin = (req, _res, next) => {
   }
   next();
 };
+
+export const requireAdminAuth = [requireSession(getAdminToken), requireAdmin];

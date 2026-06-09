@@ -12,6 +12,7 @@ import { formatINR } from '../utils/currency';
 interface ProductsViewProps {
   products: Product[];
   onOpenAddProduct: () => void;
+  onEditProduct: (product: Product) => void;
   onToggleStatus: (productId: string) => void;
   onDeleteProduct: (productId: string) => void;
 }
@@ -19,6 +20,7 @@ interface ProductsViewProps {
 export default function ProductsView({
   products,
   onOpenAddProduct,
+  onEditProduct,
   onToggleStatus,
   onDeleteProduct
 }: ProductsViewProps) {
@@ -126,6 +128,14 @@ export default function ProductsView({
                 <Trash2 size={13} />
               </button>
 
+              <button
+                onClick={() => onEditProduct(product)}
+                className="absolute top-3 right-14 z-10 bg-white/90 hover:bg-neutral-950 text-neutral-500 hover:text-white p-2 rounded-full border border-neutral-200/50 shadow-sm transition-all"
+                title="Edit product"
+              >
+                <Edit size={13} />
+              </button>
+
               {/* Image box */}
               <div className="aspect-[3/4] bg-neutral-100 relative overflow-hidden group border-b border-neutral-150">
                 <img 
@@ -145,9 +155,6 @@ export default function ProductsView({
 
                 <div className="flex flex-col gap-0.5 mt-1">
                   <h3 className="font-semibold text-neutral-900 text-sm tracking-tight text-left">{product.name}</h3>
-                  {product.location && (
-                    <span className="text-[10px] font-mono text-neutral-500 text-left mt-0.5">Location: {product.location}</span>
-                  )}
                 </div>
 
                 {/* Price and Stock details */}

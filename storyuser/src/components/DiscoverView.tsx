@@ -1,29 +1,30 @@
 import React from 'react';
-import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
-import { Product, StorefrontContent, StoryCategoryKey } from '../types';
-import { PRODUCTS } from '../data';
 import {
-  STORY_CATEGORIES,
-  StoryCategory,
-  StoryGender,
-  filterProductsForStoryCategory,
-  getCategoryImage,
-  getStoryCategory
-} from '../categoryConfig';
+  ArrowRight,
+  ChevronDown,
+  PackageSearch,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Truck,
+  X
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Category, Product, StorefrontContent } from '../types';
+import { PRODUCTS } from '../data';
 import { formatINR } from '../utils/currency';
 
 interface DiscoverViewProps {
   onSelectProduct: (product: Product) => void;
   products?: Product[];
+  categories?: Category[];
   content: StorefrontContent;
 }
 
 type SortOption = 'newest' | 'price-low' | 'price-high' | 'popular' | 'best-match';
-type FilterMenu = 'category' | 'gender' | 'size' | 'brand' | 'sort' | null;
-type GenderFilter = 'all' | StoryGender;
+type FilterMenu = 'category' | 'size' | 'brand' | 'sort' | null;
 
-const CATEGORY_OPTIONS = ['all', ...STORY_CATEGORIES.map((category) => category.key)] as Array<'all' | StoryCategoryKey>;
 const BRAND_OPTIONS = [
   'All',
   'Versace',
@@ -42,8 +43,6 @@ const BRAND_OPTIONS = [
   'Ralph Lauren'
 ];
 
-const FALLBACK_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '26', '28', '30', '32', '34', '36', '38', '40', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
-
 const SORT_LABELS: Record<SortOption, string> = {
   newest: 'Newest',
   'price-low': 'Price Low to High',
@@ -52,23 +51,66 @@ const SORT_LABELS: Record<SortOption, string> = {
   'best-match': 'Best Match'
 };
 
-const getAvailableGenders = (category: StoryCategory | null): GenderFilter[] => {
-  if (!category?.genders) return ['all'];
-  return Object.keys(category.genders) as StoryGender[];
-};
+const FALLBACK_CATEGORY_IMAGES = [
+  'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=85',
+  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
+  'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=85',
+  'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=900&q=85'
+];
 
-const getAvailableSizes = (category: StoryCategory | null, gender: GenderFilter) => {
-  if (!category?.genders) return FALLBACK_SIZES;
-  if (gender !== 'all') return category.genders[gender] || [];
+const normalize = (value = '') =>
+  value.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-  return Array.from(new Set(Object.values(category.genders).flat()));
-};
+const singular = (value = '') => normalize(value).replace(/ies$/, 'y').replace(/s$/, '');
 
-const categoryLabel = (key: 'all' | StoryCategoryKey) => key === 'all' ? 'All' : getStoryCategory(key).label;
+const titleCase = (value = '') =>
+  value.toLowerCase().replace(/\b[a-z]/g, (match) => match.toUpperCase());
+
+const countLabel = (count: number, singularLabel: string, pluralLabel: string) =>
+  `${count} ${count === 1 ? singularLabel : pluralLabel}`;
 
 const productMatchesKey = (product: Product, key: string) => product.id === key || product.slug === key;
 
 const productBrandText = (product: Product) => `${product.name} ${product.description || ''} ${product.composition || ''}`.toLowerCase();
+
+const productMatchesCategory = (product: Product, category: Category) => {
+  const productCategory = normalize(product.category);
+  const productCategorySingular = singular(product.category);
+  const categoryName = normalize(category.name);
+  const categoryNameSingular = singular(category.name);
+  const categorySlug = normalize(category.slug);
+  const categorySlugSingular = singular(category.slug);
+
+  return String(product.categoryId || '') === String(category.id)
+    || productCategory === categoryName
+    || productCategory === categorySlug
+    || productCategorySingular === categoryNameSingular
+    || productCategorySingular === categorySlugSingular;
+};
+
+const buildProductCategories = (products: Product[]): Category[] => {
+  const names = Array.from(new Set(products.map((product) => product.category).filter(Boolean)));
+
+  return names.map((name, index) => ({
+    id: `product-category-${normalize(name)}`,
+    name: titleCase(name),
+    slug: normalize(name),
+    description: `Explore ${titleCase(name)} pieces from the current collection.`,
+    image: '',
+    isActive: true,
+    productCount: products.filter((product) => normalize(product.category) === normalize(name)).length,
+    sortOrder: index,
+    isDynamic: true
+  }));
+};
+
+const getCategoryCount = (category: Category, products: Product[]) => {
+  const matchedCount = products.filter((product) => productMatchesCategory(product, category)).length;
+  return category.productCount > 0 ? category.productCount : matchedCount;
+};
+
+const hasDiscount = (product: Product) =>
+  typeof product.originalPrice === 'number' && product.originalPrice > product.price;
 
 function SelectDropdown({
   label,
@@ -76,7 +118,8 @@ function SelectDropdown({
   options,
   active,
   onToggle,
-  onSelect
+  onSelect,
+  align = 'left'
 }: {
   label: string;
   value: string;
@@ -84,17 +127,26 @@ function SelectDropdown({
   active: boolean;
   onToggle: () => void;
   onSelect: (value: string) => void;
+  align?: 'left' | 'right';
 }) {
+  const isActiveValue = value !== 'All' && value !== 'Newest';
+
   return (
     <div className="relative">
       <button
         type="button"
         onClick={onToggle}
-        className={`flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.18em] transition hover:text-[#111111] ${value !== 'All' && value !== 'Newest' ? 'text-[#111111]' : 'text-[#6f6f6f]'}`}
+        className={`flex h-11 w-full items-center justify-between gap-3 rounded-full border px-4 font-mono text-[10px] uppercase tracking-[0.13em] transition sm:w-auto ${
+          isActiveValue
+            ? 'border-[#111111] bg-[#111111] text-white'
+            : 'border-[#d7d4cc] bg-white text-[#4f4c45] hover:border-[#111111] hover:text-[#111111]'
+        }`}
         aria-label={`${label} filter`}
       >
-        {label}: <span className="font-semibold text-[#111111]">{value}</span>
-        <ChevronDown size={12} strokeWidth={1.6} className={`transition ${active ? 'rotate-180' : ''}`} />
+        <span className="truncate">
+          {label}: <span className="font-semibold">{value}</span>
+        </span>
+        <ChevronDown size={13} strokeWidth={1.7} className={`shrink-0 transition ${active ? 'rotate-180' : ''}`} />
       </button>
       <AnimatePresence>
         {active && (
@@ -102,14 +154,18 @@ function SelectDropdown({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 6 }}
-            className="absolute left-0 top-7 z-40 max-h-72 w-56 overflow-auto border border-[#111111] bg-white shadow-sm"
+            className={`absolute top-12 z-40 max-h-72 w-64 overflow-auto rounded-lg border border-[#111111] bg-white py-1 shadow-lg ${
+              align === 'right' ? 'right-0' : 'left-0'
+            }`}
           >
             {options.map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => onSelect(option)}
-                className={`block w-full px-4 py-2.5 text-left font-mono text-[10px] uppercase tracking-[0.16em] transition hover:bg-[#f4f4f1] ${value === option ? 'bg-[#111111] text-white' : 'text-[#555555]'}`}
+                className={`block w-full px-4 py-3 text-left font-mono text-[10px] uppercase tracking-[0.14em] transition hover:bg-[#f2f4f0] ${
+                  value === option ? 'bg-[#111111] text-white' : 'text-[#4f4c45]'
+                }`}
               >
                 {option}
               </button>
@@ -121,7 +177,144 @@ function SelectDropdown({
   );
 }
 
-export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, products, content }) => {
+const CategoryCard: React.FC<{
+  category: Category;
+  selected: boolean;
+  count: number;
+  fallbackImage: string;
+  onClick: () => void;
+}> = ({ category, selected, count, fallbackImage, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`group grid min-w-[238px] grid-cols-[94px_minmax(0,1fr)] overflow-hidden rounded-lg border bg-white text-left shadow-sm transition sm:min-w-0 ${
+      selected ? 'border-[#111111]' : 'border-[#d8d3ca] hover:border-[#111111]'
+    }`}
+  >
+    <span className="relative block h-28 overflow-hidden bg-[#e7e9e4]">
+      <img
+        src={category.image || fallbackImage}
+        alt={category.name}
+        className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.04]"
+        loading="lazy"
+      />
+      <span className="absolute inset-0 bg-black/10" />
+    </span>
+    <span className="flex min-w-0 flex-col justify-between p-4">
+      <span>
+        <span className="block font-mono text-[9px] uppercase tracking-widest text-[#6f6b62]">
+          Category
+        </span>
+        <span className="mt-1 block truncate text-base font-semibold uppercase text-[#111111]">
+          {category.name}
+        </span>
+        {category.description && (
+          <span className="mt-1 block line-clamp-2 text-xs leading-5 text-[#5f5b52]">
+            {category.description}
+          </span>
+        )}
+      </span>
+      <span className="mt-3 flex items-center justify-between gap-3 border-t border-[#ece9e1] pt-3 font-mono text-[9px] uppercase tracking-widest text-[#5f5b52]">
+        {countLabel(count, 'piece', 'pieces')}
+        <ArrowRight size={13} />
+      </span>
+    </span>
+  </button>
+);
+
+const ProductCard: React.FC<{
+  product: Product;
+  categories: Category[];
+  fallbackImage: string;
+  onSelectProduct: (product: Product) => void;
+}> = ({ product, categories, fallbackImage, onSelectProduct }) => {
+  const productCategory = categories.find((category) => productMatchesCategory(product, category));
+  const categoryImage = productCategory?.image || fallbackImage;
+  const imageCandidates = React.useMemo(
+    () => Array.from(new Set([product.image, product.secondaryImage, ...(product.listImages || []), categoryImage, fallbackImage].filter(Boolean))),
+    [categoryImage, fallbackImage, product.image, product.listImages, product.secondaryImage]
+  );
+  const [imageIndex, setImageIndex] = React.useState(0);
+  const [imageUnavailable, setImageUnavailable] = React.useState(false);
+  const currentImage = imageCandidates[imageIndex];
+  const colorName = product.colors && product.colors.length > 0 ? product.colors[0].name : 'Core shade';
+  const discounted = hasDiscount(product);
+  const discountPercent = discounted ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100) : 0;
+
+  React.useEffect(() => {
+    setImageIndex(0);
+    setImageUnavailable(false);
+  }, [product.id, imageCandidates]);
+
+  const handleImageError = () => {
+    if (imageIndex < imageCandidates.length - 1) {
+      setImageIndex((index) => index + 1);
+      return;
+    }
+    setImageUnavailable(true);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelectProduct(product)}
+      className="group overflow-hidden rounded-lg border border-[#d8d3ca] bg-white text-left shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-[#111111] hover:shadow-md"
+      id={`discover-card-${product.id}`}
+    >
+      <span className="relative block aspect-[3/4] overflow-hidden bg-[#e7e9e4]">
+        {!imageUnavailable && currentImage ? (
+          <img
+            src={currentImage}
+            alt={product.name}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.035]"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={handleImageError}
+          />
+        ) : (
+          <span className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#eef2ed] px-4 text-center">
+            <PackageSearch size={24} strokeWidth={1.4} className="text-[#111111]" />
+            <span className="font-mono text-[9px] uppercase tracking-widest text-[#5f5b52]">
+              Image preview coming soon
+            </span>
+          </span>
+        )}
+        {discounted && (
+          <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 font-mono text-[9px] uppercase tracking-widest text-[#111111] shadow-sm">
+            {discountPercent}% off
+          </span>
+        )}
+      </span>
+      <span className="block p-3 sm:p-4">
+        <span className="flex min-w-0 flex-col gap-3">
+          <span className="min-w-0">
+            <span className="block truncate text-xs font-semibold uppercase text-[#111111] sm:text-sm">{product.name}</span>
+            <span className="mt-1 block truncate font-mono text-[9px] uppercase tracking-widest text-[#6f6b62]">
+              {productCategory?.name || product.category}
+            </span>
+          </span>
+
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="font-mono text-sm font-semibold text-[#111111] sm:text-base">{formatINR(product.price)}</span>
+            {discounted && (
+              <>
+                <span className="font-mono text-[11px] text-[#8b877e] line-through">{formatINR(product.originalPrice!)}</span>
+                <span className="font-mono text-[9px] uppercase tracking-widest text-[#2f6d3f]">Save {discountPercent}%</span>
+              </>
+            )}
+          </span>
+        </span>
+        <span className="mt-3 flex items-center justify-between gap-2 border-t border-[#ece9e1] pt-3 font-mono text-[8px] uppercase tracking-widest text-[#6f6b62]">
+          <span className="min-w-0 truncate">{product.sizes ? product.sizes.slice(0, 4).join(' / ') : 'O/S'}</span>
+          <span className="hidden min-w-0 truncate text-right sm:block">{colorName}</span>
+          <ArrowRight size={12} className="shrink-0 text-[#111111]" />
+        </span>
+      </span>
+    </button>
+  );
+};
+
+export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, products, categories = [], content }) => {
   const rawProductSource = products && products.length > 0 ? products : PRODUCTS;
   const productSource = React.useMemo(() => {
     if (content.collectionProductIds.length === 0) return rawProductSource;
@@ -131,39 +324,38 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
     return selected.length > 0 ? selected : rawProductSource;
   }, [rawProductSource, content.collectionProductIds]);
 
+  const categoryOptions = React.useMemo(() => {
+    const adminCategories = categories
+      .filter((category) => category.isActive !== false)
+      .slice()
+      .sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name));
+
+    return adminCategories.length > 0 ? adminCategories : buildProductCategories(productSource);
+  }, [categories, productSource]);
+
   const params = React.useMemo(() => new URLSearchParams(window.location.search), []);
-  const initialCategory = params.get('category') as StoryCategoryKey | null;
+  const initialCategory = params.get('category') || 'all';
   const [searchQuery, setSearchQuery] = React.useState(params.get('q') || '');
-  const [selectedCategory, setSelectedCategory] = React.useState<'all' | StoryCategoryKey>(
-    initialCategory && STORY_CATEGORIES.some((category) => category.key === initialCategory) ? initialCategory : 'all'
-  );
-  const [selectedGender, setSelectedGender] = React.useState<GenderFilter>((params.get('gender') as GenderFilter) || 'all');
+  const [selectedCategory, setSelectedCategory] = React.useState(initialCategory);
   const [selectedSize, setSelectedSize] = React.useState(params.get('size') || 'All');
   const [selectedBrand, setSelectedBrand] = React.useState(params.get('brand') || 'All');
   const [sortBy, setSortBy] = React.useState<SortOption>((params.get('sort') as SortOption) || 'newest');
   const [activeDropdown, setActiveDropdown] = React.useState<FilterMenu>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
 
-  const activeCategory = selectedCategory === 'all' ? null : getStoryCategory(selectedCategory);
-  const genderOptions = getAvailableGenders(activeCategory);
-  const sizeOptions = getAvailableSizes(activeCategory, selectedGender);
+  const activeCategory = selectedCategory === 'all'
+    ? null
+    : categoryOptions.find((category) => category.slug === selectedCategory || category.id === selectedCategory || normalize(category.name) === normalize(selectedCategory)) || null;
 
   React.useEffect(() => {
     if (selectedCategory === 'all') return;
-    const category = getStoryCategory(selectedCategory);
-    const availableGenders = getAvailableGenders(category);
-
-    if (!availableGenders.includes(selectedGender)) {
-      setSelectedGender(availableGenders[0] || 'all');
-      setSelectedSize('All');
-    }
-  }, [selectedCategory, selectedGender]);
+    if (!activeCategory && categoryOptions.length > 0) setSelectedCategory('all');
+  }, [activeCategory, categoryOptions.length, selectedCategory]);
 
   React.useEffect(() => {
     const nextParams = new URLSearchParams();
     if (searchQuery) nextParams.set('q', searchQuery);
     if (selectedCategory !== 'all') nextParams.set('category', selectedCategory);
-    if (selectedGender !== 'all') nextParams.set('gender', selectedGender);
     if (selectedSize !== 'All') nextParams.set('size', selectedSize);
     if (selectedBrand !== 'All') nextParams.set('brand', selectedBrand);
     if (sortBy !== 'newest') nextParams.set('sort', sortBy);
@@ -173,26 +365,34 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
     if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
       window.history.replaceState({}, '', nextUrl);
     }
-  }, [searchQuery, selectedBrand, selectedCategory, selectedGender, selectedSize, sortBy]);
+  }, [searchQuery, selectedBrand, selectedCategory, selectedSize, sortBy]);
 
-  const setCategoryFilter = (category: 'all' | StoryCategoryKey) => {
-    setSelectedCategory(category);
+  const categoryCounts = React.useMemo(() => {
+    const entries = categoryOptions.map((category) => [
+      category.slug,
+      getCategoryCount(category, productSource)
+    ] as const);
+    return new Map(entries);
+  }, [categoryOptions, productSource]);
+
+  const categoryProductsForSizes = React.useMemo(() => (
+    activeCategory ? productSource.filter((product) => productMatchesCategory(product, activeCategory)) : productSource
+  ), [activeCategory, productSource]);
+
+  const sizeOptions = React.useMemo(
+    () => Array.from(new Set(categoryProductsForSizes.flatMap((product) => product.sizes || []))),
+    [categoryProductsForSizes]
+  );
+
+  const setCategoryFilter = (categorySlug: string) => {
+    setSelectedCategory(categorySlug);
     setSelectedSize('All');
     setActiveDropdown(null);
-
-    if (category === 'all') {
-      setSelectedGender('all');
-      return;
-    }
-
-    const availableGenders = getAvailableGenders(getStoryCategory(category));
-    setSelectedGender(availableGenders.includes('women') ? 'women' : availableGenders[0] || 'all');
   };
 
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory('all');
-    setSelectedGender('all');
     setSelectedSize('All');
     setSelectedBrand('All');
     setSortBy('newest');
@@ -202,10 +402,10 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
 
   const filteredProducts = React.useMemo(() => {
     let result = [...productSource];
+    const query = searchQuery.trim().toLowerCase();
 
-    if (selectedCategory !== 'all') {
-      const categoryProductIds = new Set(filterProductsForStoryCategory(result, selectedCategory).map((product) => product.id));
-      result = result.filter((product) => categoryProductIds.has(product.id));
+    if (activeCategory) {
+      result = result.filter((product) => productMatchesCategory(product, activeCategory));
     }
 
     if (selectedSize !== 'All') {
@@ -217,8 +417,7 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
       result = result.filter((product) => productBrandText(product).includes(brand));
     }
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (query) {
       result = result.filter((product) => (
         product.name.toLowerCase().includes(query) ||
         product.category.toLowerCase().includes(query) ||
@@ -229,27 +428,31 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
 
     if (sortBy === 'price-low') result.sort((a, b) => a.price - b.price);
     if (sortBy === 'price-high') result.sort((a, b) => b.price - a.price);
+    if (sortBy === 'popular') result.sort((a, b) => (b.stock || 0) - (a.stock || 0));
+    if (sortBy === 'best-match' && query) {
+      result.sort((a, b) => Number(b.name.toLowerCase().startsWith(query)) - Number(a.name.toLowerCase().startsWith(query)));
+    }
 
     return result;
-  }, [productSource, searchQuery, selectedBrand, selectedCategory, selectedSize, sortBy]);
+  }, [activeCategory, productSource, searchQuery, selectedBrand, selectedSize, sortBy]);
 
-  const categoryDropdownOptions = CATEGORY_OPTIONS.map(categoryLabel);
-  const categoryValue = categoryLabel(selectedCategory);
-  const genderDropdownOptions = genderOptions.map((gender) => gender === 'all' ? 'All' : gender[0].toUpperCase() + gender.slice(1));
-  const genderValue = selectedGender === 'all' ? 'All' : selectedGender[0].toUpperCase() + selectedGender.slice(1);
+  const categoryDropdownOptions = ['All', ...categoryOptions.map((category) => category.name)];
+  const categoryValue = activeCategory?.name || 'All';
   const sizeDropdownOptions = ['All', ...sizeOptions];
   const sortOptions = Object.values(SORT_LABELS);
   const sortValue = SORT_LABELS[sortBy];
+  const canClearFilters = Boolean(searchQuery || selectedCategory !== 'all' || selectedSize !== 'All' || selectedBrand !== 'All' || sortBy !== 'newest');
+  const activeFilterCount = [searchQuery, selectedCategory !== 'all', selectedSize !== 'All', selectedBrand !== 'All', sortBy !== 'newest'].filter(Boolean).length;
+  const heroImage = content.collectionImage || categoryOptions.find((category) => category.image)?.image || FALLBACK_CATEGORY_IMAGES[0];
 
   const selectCategoryByLabel = (label: string) => {
-    const category = CATEGORY_OPTIONS.find((option) => categoryLabel(option) === label) || 'all';
-    setCategoryFilter(category);
-  };
+    if (label === 'All') {
+      setCategoryFilter('all');
+      return;
+    }
 
-  const selectGenderByLabel = (label: string) => {
-    setSelectedGender(label === 'All' ? 'all' : label.toLowerCase() as StoryGender);
-    setSelectedSize('All');
-    setActiveDropdown(null);
+    const category = categoryOptions.find((item) => item.name === label);
+    setCategoryFilter(category?.slug || 'all');
   };
 
   const selectSortByLabel = (label: string) => {
@@ -263,216 +466,224 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
+      transition={{ duration: 0.35 }}
       id="discover-view-container"
-      className="mx-auto max-w-7xl space-y-10 px-4 py-10 sm:px-6 lg:px-8 lg:py-14"
+      className="bg-[#f7f7f4] pb-16 text-[#111111] sm:pb-20"
     >
-      <header className="mx-auto max-w-4xl text-center" id="categories-header-title">
-        <span className="mb-3 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-[#767676]">
-          CURATED DROPS
-        </span>
-        <h1 className="font-display text-[clamp(2.7rem,10vw,5.75rem)] font-black uppercase leading-none text-[#121212]">
-          Shop the Story Edit
-        </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[#555555]">
-          Verified branded fashion, curated in India across clothing, footwear, and everyday essentials.
-        </p>
-      </header>
+      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-stretch">
+          <div className="rounded-xl border border-[#d8d3ca] bg-white p-5 shadow-sm sm:p-7 lg:p-8">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6f6b62]">
+              {content.discoverEyebrow || 'Curated drops'}
+            </span>
+            <h1 className="mt-3 max-w-3xl text-4xl font-semibold uppercase leading-none text-[#111111] sm:text-5xl lg:text-6xl">
+              Shop the Story Edit
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[#5f5b52]">
+              {content.collectionBody || 'Verified branded fashion, curated in India across clothing, footwear, and everyday essentials.'}
+            </p>
 
-      <div className="mx-auto max-w-3xl space-y-5" id="search-bar-block">
-        <div className="relative flex items-center border border-[#111111] bg-white">
-          <Search size={18} strokeWidth={1.5} className="ml-4 text-[#111111]" />
-          <input
-            type="text"
-            placeholder="SEARCH UPPERS, FOOTWEAR, BRANDS OR SIZES..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full border-0 bg-transparent px-4 py-3.5 font-mono text-[11px] tracking-widest text-[#111111] placeholder:text-[#9a9a94] focus:outline-none"
-            id="discover-search-input"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              aria-label="Clear search"
-              className="px-4 py-2 text-[#767676] transition hover:text-[#121212]"
-            >
-              <X size={16} strokeWidth={1.5} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <span className="mr-2 font-mono text-[8px] font-semibold uppercase tracking-widest text-[#767676]">
-            SHOP BY CATEGORY:
-          </span>
-          {CATEGORY_OPTIONS.map((category) => (
-            <button
-              key={category}
-              type="button"
-              onClick={() => setCategoryFilter(category)}
-              className={`border px-3 py-1.5 font-mono text-[8px] uppercase tracking-widest transition ${
-                selectedCategory === category
-                  ? 'border-[#121212] bg-[#121212] text-white'
-                  : 'border-[#e0e0dc] bg-white text-[#555555] hover:border-[#121212] hover:text-[#121212]'
-              }`}
-            >
-              {categoryLabel(category)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <section aria-label="Category strip" className="overflow-hidden">
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {STORY_CATEGORIES.map((category) => (
-            <button
-              key={category.key}
-              type="button"
-              onClick={() => setCategoryFilter(category.key)}
-              className={`group relative h-36 w-36 shrink-0 overflow-hidden border text-left transition sm:h-40 sm:w-44 ${
-                selectedCategory === category.key ? 'border-[#111111]' : 'border-[#d8d8d3]'
-              }`}
-            >
-              <img
-                src={getCategoryImage(category, selectedGender)}
-                alt={category.label}
-                className="absolute inset-0 h-full w-full object-cover object-top grayscale brightness-105 transition duration-500 group-hover:scale-[1.03]"
-                loading="lazy"
-              />
-              <span className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
-              <span className="absolute bottom-3 left-3 right-3 text-white">
-                <span className="block font-display text-xl font-black uppercase leading-none">{category.label}</span>
-                <span className="mt-2 inline-flex items-center gap-1 font-mono text-[8px] uppercase tracking-[0.18em]">
-                  Shop <ChevronDown size={10} className="-rotate-90" />
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <div className="hidden items-center justify-between border-y border-[#121212] bg-[#fafafa] px-4 py-4 lg:flex">
-        <div className="flex flex-wrap items-center gap-8">
-          <SelectDropdown label="Category" value={categoryValue} options={categoryDropdownOptions} active={activeDropdown === 'category'} onToggle={() => setActiveDropdown(activeDropdown === 'category' ? null : 'category')} onSelect={selectCategoryByLabel} />
-          <SelectDropdown label="Gender" value={genderValue} options={genderDropdownOptions} active={activeDropdown === 'gender'} onToggle={() => setActiveDropdown(activeDropdown === 'gender' ? null : 'gender')} onSelect={selectGenderByLabel} />
-          <SelectDropdown label="Size" value={selectedSize} options={sizeDropdownOptions} active={activeDropdown === 'size'} onToggle={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')} onSelect={(value) => { setSelectedSize(value); setActiveDropdown(null); }} />
-          <SelectDropdown label="Brand" value={selectedBrand} options={BRAND_OPTIONS} active={activeDropdown === 'brand'} onToggle={() => setActiveDropdown(activeDropdown === 'brand' ? null : 'brand')} onSelect={(value) => { setSelectedBrand(value); setActiveDropdown(null); }} />
-        </div>
-        <SelectDropdown label="Sort By" value={sortValue} options={sortOptions} active={activeDropdown === 'sort'} onToggle={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')} onSelect={selectSortByLabel} />
-      </div>
-
-      <div className="lg:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileFiltersOpen(true)}
-          className="flex w-full items-center justify-center gap-2 border border-[#111111] bg-white px-5 py-4 font-mono text-[10px] uppercase tracking-[0.2em] text-[#111111]"
-        >
-          <SlidersHorizontal size={14} strokeWidth={1.6} />
-          Filter & Sort
-        </button>
-      </div>
-
-      <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.18em] text-[#767676]">
-        <div className="flex items-center gap-1.5">
-          <SlidersHorizontal size={11} />
-          <span>SHOWING {filteredProducts.length} CURATED PIECES</span>
-        </div>
-        <button type="button" onClick={clearFilters} className="text-[#111111] hover:underline">
-          Clear All
-        </button>
-      </div>
-
-      <div
-        className="grid grid-cols-1 overflow-hidden border-l border-t border-[#121212] sm:grid-cols-2 lg:grid-cols-4"
-        id="categories-grid-collection-view"
-      >
-        {filteredProducts.map((product) => (
-          <button
-            key={product.id}
-            type="button"
-            onClick={() => onSelectProduct(product)}
-            className="group flex cursor-pointer flex-col justify-between border-r border-b border-[#121212] bg-white text-left"
-            id={`discover-card-${product.id}`}
-          >
-            <div className="relative flex aspect-[3/4.1] w-full items-center justify-center overflow-hidden bg-[#f6f5f2]">
-              <img
-                src={product.image}
-                alt={product.name}
-                className="h-full w-full object-cover grayscale brightness-95 transition-all duration-500 ease-out group-hover:scale-[1.03] group-hover:grayscale-0"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-            <div className="flex items-start justify-between border-t border-[#121212] bg-white p-4">
-              <div className="min-w-0 space-y-0.5 pr-2">
-                <h2 className="truncate text-xs font-medium uppercase tracking-wider text-[#121212] group-hover:underline">
-                  {product.name}
-                </h2>
-                <div className="flex items-center gap-1.5 text-[#767676]">
-                  <span className="font-mono text-[8px] uppercase tracking-wider">
-                    {product.sizes ? product.sizes.join(' / ') : 'O/S'}
-                  </span>
-                  <span className="text-[7.5px]">/</span>
-                  <span className="max-w-[80px] truncate font-mono text-[8px] uppercase tracking-wider">
-                    {product.colors && product.colors.length > 0 ? product.colors[0].name : 'ECRU'}
-                  </span>
-                </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg bg-[#eef2ed] p-4">
+                <PackageSearch size={17} strokeWidth={1.5} />
+                <p className="mt-3 font-mono text-[9px] uppercase tracking-widest text-[#6f6b62]">Available</p>
+                <p className="mt-1 text-sm font-semibold">{countLabel(productSource.length, 'curated piece', 'curated pieces')}</p>
               </div>
-              <span className="shrink-0 pt-0.5 font-mono text-xs font-semibold text-[#121212]">
-                {formatINR(product.price)}
-              </span>
+              <div className="rounded-lg bg-[#f3f0ea] p-4">
+                <ShieldCheck size={17} strokeWidth={1.5} />
+                <p className="mt-3 font-mono text-[9px] uppercase tracking-widest text-[#6f6b62]">Quality</p>
+                <p className="mt-1 text-sm font-semibold">Verified branded fashion</p>
+              </div>
+              <div className="rounded-lg bg-[#edf0f4] p-4">
+                <Truck size={17} strokeWidth={1.5} />
+                <p className="mt-3 font-mono text-[9px] uppercase tracking-widest text-[#6f6b62]">Delivery</p>
+                <p className="mt-1 text-sm font-semibold">Tracked India shipping</p>
+              </div>
             </div>
-          </button>
-        ))}
+
+            <div className="mt-6 max-w-2xl">
+              <label htmlFor="discover-search-input" className="sr-only">Search collections</label>
+              <div className="relative flex items-center rounded-full border border-[#d7d4cc] bg-[#fbfbf8] shadow-sm focus-within:border-[#111111]">
+                <Search size={18} strokeWidth={1.5} className="ml-4 shrink-0 text-[#111111]" />
+                <input
+                  type="text"
+                  placeholder={content.discoverSearchPlaceholder || 'Search products, categories, brands or sizes'}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="min-w-0 flex-1 border-0 bg-transparent px-4 py-3.5 text-sm text-[#111111] placeholder:text-[#8b877e] focus:outline-none"
+                  id="discover-search-input"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Clear search"
+                    className="mr-2 rounded-full p-2 text-[#767676] transition hover:bg-white hover:text-[#121212]"
+                  >
+                    <X size={16} strokeWidth={1.5} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="relative min-h-72 overflow-hidden rounded-xl border border-[#d8d3ca] bg-[#e7e9e4] shadow-sm lg:min-h-full">
+            <img
+              src={heroImage}
+              alt="STORY collection edit"
+              className="h-full min-h-72 w-full object-cover object-top"
+              loading="lazy"
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-5 text-white">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-white/75">This week</p>
+              <p className="mt-1 text-lg font-semibold uppercase">Fresh edits for daily wear</p>
+            </div>
+          </div>
+        </section>
+
+        <section aria-label="Shop by category" className="mt-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-[#111111]">Shop by category</h2>
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('all')}
+              className={`hidden rounded-full border px-4 py-2 font-mono text-[9px] uppercase tracking-widest transition sm:inline-flex ${
+                selectedCategory === 'all'
+                  ? 'border-[#111111] bg-[#111111] text-white'
+                  : 'border-[#d8d3ca] bg-white text-[#5f5b52] hover:border-[#111111] hover:text-[#111111]'
+              }`}
+            >
+              All collections
+            </button>
+          </div>
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 md:grid-cols-3 xl:grid-cols-4">
+            {categoryOptions.map((category, index) => (
+              <CategoryCard
+                key={category.id}
+                category={category}
+                selected={activeCategory?.id === category.id}
+                count={categoryCounts.get(category.slug) || 0}
+                fallbackImage={FALLBACK_CATEGORY_IMAGES[index % FALLBACK_CATEGORY_IMAGES.length]}
+                onClick={() => setCategoryFilter(category.slug)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-5 rounded-xl border border-[#d8d3ca] bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-[#6f6b62]">
+                <SlidersHorizontal size={14} strokeWidth={1.6} />
+                Showing {countLabel(filteredProducts.length, 'piece', 'pieces')}
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-[#111111]">
+                {activeCategory?.name || 'All curated pieces'}
+              </h2>
+            </div>
+
+            <div className="hidden flex-wrap justify-end gap-3 lg:flex">
+              <SelectDropdown label="Category" value={categoryValue} options={categoryDropdownOptions} active={activeDropdown === 'category'} onToggle={() => setActiveDropdown(activeDropdown === 'category' ? null : 'category')} onSelect={selectCategoryByLabel} />
+              <SelectDropdown label="Size" value={selectedSize} options={sizeDropdownOptions} active={activeDropdown === 'size'} onToggle={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')} onSelect={(value) => { setSelectedSize(value); setActiveDropdown(null); }} />
+              <SelectDropdown label="Brand" value={selectedBrand} options={BRAND_OPTIONS} active={activeDropdown === 'brand'} onToggle={() => setActiveDropdown(activeDropdown === 'brand' ? null : 'brand')} onSelect={(value) => { setSelectedBrand(value); setActiveDropdown(null); }} />
+              <SelectDropdown label="Sort" value={sortValue} options={sortOptions} active={activeDropdown === 'sort'} onToggle={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')} onSelect={selectSortByLabel} align="right" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen(true)}
+              className="flex h-11 items-center justify-center gap-2 rounded-full border border-[#111111] bg-white px-5 font-mono text-[10px] uppercase tracking-widest text-[#111111] lg:hidden"
+            >
+              <SlidersHorizontal size={14} strokeWidth={1.6} />
+              Filter & sort
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-[#111111] px-2 py-0.5 text-white">{activeFilterCount}</span>
+              )}
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#ece9e1] pt-4">
+            {activeCategory && <FilterPill label={`Category: ${activeCategory.name}`} onClear={() => setCategoryFilter('all')} />}
+            {selectedSize !== 'All' && <FilterPill label={`Size: ${selectedSize}`} onClear={() => setSelectedSize('All')} />}
+            {selectedBrand !== 'All' && <FilterPill label={`Brand: ${selectedBrand}`} onClear={() => setSelectedBrand('All')} />}
+            {searchQuery && <FilterPill label={`Search: ${searchQuery}`} onClear={() => setSearchQuery('')} />}
+            {canClearFilters ? (
+              <button type="button" onClick={clearFilters} className="ml-auto font-mono text-[10px] uppercase tracking-widest text-[#111111] hover:underline">
+                Clear all
+              </button>
+            ) : (
+              <p className="font-mono text-[10px] uppercase tracking-widest text-[#8b877e]">No filters applied</p>
+            )}
+          </div>
+        </section>
+
+        {filteredProducts.length > 0 ? (
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5" id="categories-grid-collection-view">
+            {filteredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                categories={categoryOptions}
+                fallbackImage={heroImage}
+                onSelectProduct={onSelectProduct}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl border border-dashed border-[#cfcac0] bg-white px-6 py-16 text-center shadow-sm" id="discover-empty-state">
+            <Sparkles className="mx-auto text-[#111111]" size={26} strokeWidth={1.4} />
+            <p className="mt-4 text-lg font-semibold text-[#111111]">No pieces found</p>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#6a665d]">
+              Try clearing a filter, searching another category, or returning to the full edit.
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-5 h-10 rounded-full border border-[#111111] bg-[#111111] px-5 font-mono text-[10px] uppercase tracking-widest text-white transition hover:bg-black"
+            >
+              Reset filters
+            </button>
+          </div>
+        )}
+
+        <p className="mt-10 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-[#6f6f6f]">
+          Verified authentic pieces &bull; Curated in India &bull; Easy returns and exchanges
+        </p>
       </div>
-
-      {filteredProducts.length === 0 && (
-        <div className="space-y-3 border border-dashed border-[#121212]/30 py-20 text-center" id="discover-empty-state">
-          <p className="font-mono text-xs uppercase text-[#767676]">NO PIECES FOUND</p>
-          <p className="text-sm text-[#555555]">Try changing category, size, brand, or gender filters.</p>
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="bg-[#121212] px-6 py-3 font-mono text-[9px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-black"
-          >
-            Reset Filters
-          </button>
-        </div>
-      )}
-
-      <p className="text-center font-mono text-[10px] uppercase tracking-[0.22em] text-[#6f6f6f]">
-        Verified authentic pieces &bull; 100% original &bull; Best price & quality
-      </p>
 
       <AnimatePresence>
         {mobileFiltersOpen && (
-          <motion.div className="fixed inset-0 z-50 bg-black/40 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div className="fixed inset-0 z-50 bg-black/45 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ duration: 0.28 }}
-              className="absolute bottom-0 left-0 right-0 max-h-[86vh] overflow-auto border-t border-[#111111] bg-white p-5"
+              className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-auto rounded-t-2xl border-t border-[#111111] bg-white p-5 shadow-2xl"
             >
               <div className="mb-5 flex items-center justify-between">
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#111111]">Filter & Sort</p>
-                <button type="button" onClick={() => setMobileFiltersOpen(false)} aria-label="Close filters">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#6f6b62]">Filter & sort</p>
+                  <p className="mt-1 text-lg font-semibold text-[#111111]">{countLabel(filteredProducts.length, 'piece', 'pieces')} visible</p>
+                </div>
+                <button type="button" onClick={() => setMobileFiltersOpen(false)} aria-label="Close filters" className="rounded-full border border-[#d8d3ca] p-2">
                   <X size={18} strokeWidth={1.6} />
                 </button>
               </div>
-              <div className="space-y-5">
+
+              <div className="space-y-3">
                 <SelectDropdown label="Category" value={categoryValue} options={categoryDropdownOptions} active={activeDropdown === 'category'} onToggle={() => setActiveDropdown(activeDropdown === 'category' ? null : 'category')} onSelect={selectCategoryByLabel} />
-                <SelectDropdown label="Gender" value={genderValue} options={genderDropdownOptions} active={activeDropdown === 'gender'} onToggle={() => setActiveDropdown(activeDropdown === 'gender' ? null : 'gender')} onSelect={selectGenderByLabel} />
                 <SelectDropdown label="Size" value={selectedSize} options={sizeDropdownOptions} active={activeDropdown === 'size'} onToggle={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')} onSelect={(value) => { setSelectedSize(value); setActiveDropdown(null); }} />
                 <SelectDropdown label="Brand" value={selectedBrand} options={BRAND_OPTIONS} active={activeDropdown === 'brand'} onToggle={() => setActiveDropdown(activeDropdown === 'brand' ? null : 'brand')} onSelect={(value) => { setSelectedBrand(value); setActiveDropdown(null); }} />
-                <SelectDropdown label="Sort By" value={sortValue} options={sortOptions} active={activeDropdown === 'sort'} onToggle={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')} onSelect={selectSortByLabel} />
+                <SelectDropdown label="Sort" value={sortValue} options={sortOptions} active={activeDropdown === 'sort'} onToggle={() => setActiveDropdown(activeDropdown === 'sort' ? null : 'sort')} onSelect={selectSortByLabel} />
               </div>
-              <div className="mt-8 grid grid-cols-2 gap-3">
-                <button type="button" onClick={clearFilters} className="border border-[#111111] px-5 py-3 font-mono text-[10px] uppercase tracking-[0.2em]">
-                  Clear All
+
+              <div className="sticky bottom-0 mt-6 grid grid-cols-2 gap-3 bg-white pt-4">
+                <button type="button" onClick={clearFilters} className="h-11 rounded-full border border-[#111111] px-5 font-mono text-[10px] uppercase tracking-widest">
+                  Clear all
                 </button>
-                <button type="button" onClick={() => setMobileFiltersOpen(false)} className="border border-[#111111] bg-[#111111] px-5 py-3 font-mono text-[10px] uppercase tracking-[0.2em] text-white">
-                  Apply Filters
+                <button type="button" onClick={() => setMobileFiltersOpen(false)} className="h-11 rounded-full border border-[#111111] bg-[#111111] px-5 font-mono text-[10px] uppercase tracking-widest text-white">
+                  Show pieces
                 </button>
               </div>
             </motion.div>
@@ -482,3 +693,12 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
     </motion.div>
   );
 };
+
+const FilterPill: React.FC<{ label: string; onClear: () => void }> = ({ label, onClear }) => (
+  <span className="inline-flex h-9 items-center gap-2 rounded-full bg-[#eef2ed] px-3 font-mono text-[9px] uppercase tracking-widest text-[#111111]">
+    {label}
+    <button type="button" onClick={onClear} aria-label={`Clear ${label}`} className="rounded-full bg-white p-1">
+      <X size={10} strokeWidth={1.8} />
+    </button>
+  </span>
+);

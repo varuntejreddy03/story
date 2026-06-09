@@ -1,7 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/db.js';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAdminAuth } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
@@ -41,7 +41,7 @@ contactRouter.post('/', validate(z.object({
   res.status(201).json({ success: true, data: serializeContactRequest(request) });
 }));
 
-adminContactRouter.use(requireAuth, requireAdmin);
+adminContactRouter.use(requireAdminAuth);
 
 adminContactRouter.get('/', asyncHandler(async (_req, res) => {
   const requests = await prisma.contactRequest.findMany({

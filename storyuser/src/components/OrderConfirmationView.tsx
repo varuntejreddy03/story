@@ -226,7 +226,7 @@ export const OrderConfirmationView: React.FC<OrderConfirmationViewProps> = ({
           className="border border-[#121212] bg-white text-[#121212] hover:bg-neutral-50 py-4 px-8 font-mono text-xs tracking-widest font-semibold transition-all cursor-pointer inline-flex items-center justify-center space-x-2"
           id="confirm-view-orders-btn"
         >
-          <span>VIEW DIARY IN SETTINGS</span>
+          <span>VIEW ORDERS</span>
         </button>
       </div>
 

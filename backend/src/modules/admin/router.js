@@ -1,47 +1,76 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/db.js';
-import { requireAdmin, requireAuth } from '../../middleware/auth.js';
+import { requireAdminAuth } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
-import { serializeUser } from '../../utils/serializers.js';
+import { serializeOrder, serializeUser } from '../../utils/serializers.js';
 import { toNumber } from '../../utils/money.js';
 
 export const adminRouter = express.Router();
-adminRouter.use(requireAuth, requireAdmin);
+adminRouter.use(requireAdminAuth);
+
+const serializeAdminOrderSummary = (order) => ({
+  ...serializeOrder(order),
+  customerName: order.user
+    ? `${order.user.firstName}${order.user.lastName ? ` ${order.user.lastName}` : ''}`
+    : order.addressSnapshot?.fullName || order.addressSnapshot?.name || 'STORY Client',
+  customerEmail: order.user?.email || '',
+  amount: toNumber(order.total),
+  paymentStatus: order.paymentStatus,
+  fulfillmentStatus: order.status
+});
 
 adminRouter.get('/dashboard/stats', asyncHandler(async (_req, res) => {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const startOfMonth = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1);
 
-  const [orders, products, users, lowStockProducts] = await Promise.all([
-    prisma.order.findMany({ where: { paymentStatus: 'paid' } }),
+  const [
+    todayRevenue,
+    monthRevenue,
+    allTimeRevenue,
+    totalOrders,
+    todayOrders,
+    monthOrders,
+    products,
+    users,
+    lowStockProducts,
+    recentOrders
+  ] = await Promise.all([
+    prisma.order.aggregate({ where: { paymentStatus: 'paid', createdAt: { gte: startOfToday } }, _sum: { total: true } }),
+    prisma.order.aggregate({ where: { paymentStatus: 'paid', createdAt: { gte: startOfMonth } }, _sum: { total: true } }),
+    prisma.order.aggregate({ where: { paymentStatus: 'paid' }, _sum: { total: true } }),
+    prisma.order.count(),
+    prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
+    prisma.order.count({ where: { createdAt: { gte: startOfMonth } } }),
     prisma.product.count({ where: { isActive: true } }),
-    prisma.user.count({ where: { role: 'user' } }),
-    prisma.product.count({ where: { stock: { lte: 5 }, isActive: true } })
+    prisma.user.count(),
+    prisma.product.count({ where: { stock: { lt: 5 }, isActive: true } }),
+    prisma.order.findMany({
+      include: { items: true, user: true },
+      orderBy: { createdAt: 'desc' },
+      take: 5
+    })
   ]);
-
-  const revenue = (since) => orders
-    .filter((order) => !since || order.createdAt >= since)
-    .reduce((sum, order) => sum + toNumber(order.total), 0);
 
   res.json({
     success: true,
     data: {
       revenue: {
-        today: revenue(startOfToday),
-        month: revenue(startOfMonth),
-        allTime: revenue()
+        today: toNumber(todayRevenue._sum.total),
+        month: toNumber(monthRevenue._sum.total),
+        allTime: toNumber(allTimeRevenue._sum.total)
       },
       orders: {
-        total: orders.length,
-        today: orders.filter((order) => order.createdAt >= startOfToday).length,
-        month: orders.filter((order) => order.createdAt >= startOfMonth).length
+        total: totalOrders,
+        today: todayOrders,
+        month: monthOrders
       },
       products,
       users,
-      lowStockProducts
+      lowStockProducts,
+      recentOrders: recentOrders.map(serializeAdminOrderSummary)
     }
   });
 }));

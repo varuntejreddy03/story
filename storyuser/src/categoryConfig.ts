@@ -1,4 +1,4 @@
-import { Product, StoryCategoryKey } from './types';
+import { Product, StoryCategoryContent, StoryCategoryKey } from './types';
 
 export type StoryGender = 'men' | 'women';
 
@@ -141,6 +141,31 @@ export const LEGACY_CATEGORY_ALIASES: Partial<Record<string, StoryCategoryKey>> 
 export const getStoryCategory = (key: StoryCategoryKey) =>
   STORY_CATEGORIES.find((category) => category.key === key) || STORY_CATEGORIES[0];
 
+export const mergeStoryCategoryContent = (overrides: StoryCategoryContent[] = []) => {
+  const overrideMap = new Map(overrides.map((category) => [category.key, category]));
+
+  return STORY_CATEGORIES.map((category) => {
+    const override = overrideMap.get(category.key);
+    if (!override) return category;
+
+    return {
+      ...category,
+      ...override,
+      categories: override.categories?.length ? override.categories : category.categories,
+      imageFallback: override.imageFallback || category.imageFallback,
+      images: {
+        ...category.images,
+        ...override.images
+      },
+      genders: category.genders,
+      subcategories: override.subcategories?.length ? override.subcategories : category.subcategories
+    };
+  });
+};
+
+export const getStoryCategoryFromList = (categories: StoryCategory[], key: StoryCategoryKey) =>
+  categories.find((category) => category.key === key) || categories[0] || STORY_CATEGORIES[0];
+
 export const getCategoryImage = (category: StoryCategory, selectedGender?: StoryGender | 'all') => {
   if (selectedGender && selectedGender !== 'all' && category.images[selectedGender]) {
     return category.images[selectedGender] || category.imageFallback;
@@ -149,7 +174,11 @@ export const getCategoryImage = (category: StoryCategory, selectedGender?: Story
   return category.images.default || category.images.women || category.images.men || category.imageFallback;
 };
 
-export const filterProductsForStoryCategory = (products: Product[], key: StoryCategoryKey) => {
-  const category = getStoryCategory(key);
+export const filterProductsForStoryCategory = (
+  products: Product[],
+  key: StoryCategoryKey,
+  categories: StoryCategory[] = STORY_CATEGORIES
+) => {
+  const category = getStoryCategoryFromList(categories, key);
   return products.filter((product) => category.categories.includes(product.category.toUpperCase()));
 };
