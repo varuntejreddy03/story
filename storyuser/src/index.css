@@ -1,51 +1,57 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=Playfair+Display:wght@700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-display: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  
-  /* Absolute black and white base styling */
-  --color-brand-charcoal: #121212;
-  --color-brand-beige: #F6F5F2;
-  --color-brand-border: #E5E5E5;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-surface: #F8F6F1;
+  --color-card: #FFFFFF;
+  --color-soft: #EFECE6;
+  --color-primary: #111111;
+  --color-muted: #6B625A;
+  --color-border: #DDD8CF;
+  --color-accent: #111111;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #FAFAFA;
-  color: #121212;
+  background-color: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom minimal scrollbar with sharp styling */
+/* Elegant minimal scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #FAFAFA;
+  background: var(--color-surface);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #121212;
+  background: var(--color-border);
+  border-radius: 4px;
 }
 
-/* Remove default focus ring styling for elegant custom outlines */
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
 input:focus, select:focus, textarea:focus {
   outline: none;
 }
 
+/* Marquee animations */
 @keyframes story-brand-marquee {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
 }
 
 .brand-marquee {
@@ -58,18 +64,12 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand-marquee {
-    animation-duration: 120s;
-  }
+  .brand-marquee { animation-duration: 120s; }
 }
 
 @keyframes marquee {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
 }
 
 .animate-marquee {

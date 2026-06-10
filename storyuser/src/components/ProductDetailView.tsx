@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ChevronDown, ChevronUp, ShoppingBag, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Minus, Plus, ShoppingBag, Truck, RotateCcw, PackageSearch } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Product, ColorOption } from '../types';
 import { PRODUCTS } from '../data';
@@ -8,6 +8,9 @@ import { formatINR } from '../utils/currency';
 interface ProductDetailViewProps {
   product: Product;
   onAddToCart: (product: Product, size: string, color: ColorOption) => void;
+  onUpdateQuantity: (id: string, delta: number) => void;
+  onRemoveItem: (id: string) => void;
+  cartItems: Array<{ id: string; product: Product; selectedSize: string; selectedColor: ColorOption; quantity: number }>;
   onBack: () => void;
   onSelectProduct: (product: Product) => void;
   products?: Product[];
@@ -16,310 +19,346 @@ interface ProductDetailViewProps {
 export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
   product,
   onAddToCart,
+  onUpdateQuantity,
+  onRemoveItem,
+  cartItems,
   onBack,
   onSelectProduct,
   products
 }) => {
-  const [selectedSize, setSelectedSize] = React.useState<string>('');
+  const [selectedSize, setSelectedSize] = React.useState('');
   const [selectedColor, setSelectedColor] = React.useState<ColorOption>(
-    product.colors && product.colors.length > 0 ? product.colors[0] : { name: "Default", hex: "#121212" }
+    product.colors?.[0] || { name: 'Default', hex: '#111111' }
   );
-  
-  // Accordion Expanders
-  const [expandedSection, setExpandedSection] = React.useState<'details' | 'composition' | 'care' | null>('details');
-  const [addedNotify, setAddedNotify] = React.useState(false);
+  const [expandedSection, setExpandedSection] = React.useState<string | null>('details');
+  const [sizeError, setSizeError] = React.useState(false);
+  const [activeImageIdx, setActiveImageIdx] = React.useState(0);
 
-  // Fallback images if listImages not defined
-  const displayImages = React.useMemo(() => {
-    if (product.listImages && product.listImages.length > 0) return product.listImages;
-    if (product.secondaryImage) return [product.image, product.secondaryImage];
-    return [product.image];
+  // Get real cart quantity for this product + size + color combo
+  const cartItemId = `${product.id}-${selectedSize || 'O/S'}-${selectedColor.name.toLowerCase()}`;
+  const cartItem = cartItems.find((item) => item.id === cartItemId);
+  const cartQty = cartItem?.quantity || 0;
+
+  // Only show real product images — no unrelated fallbacks
+  const gallery = React.useMemo(() => {
+    const images: string[] = [];
+    if (product.image) images.push(product.image);
+    if (product.listImages?.length) {
+      product.listImages.forEach((img) => { if (img && !images.includes(img)) images.push(img); });
+    }
+    if (product.secondaryImage && !images.includes(product.secondaryImage)) {
+      images.push(product.secondaryImage);
+    }
+    return images.length > 0 ? images : [];
   }, [product]);
 
-  // Handle setting sizes on init
   React.useEffect(() => {
-    if (product.sizes && product.sizes.length > 0) {
-      setSelectedSize(product.sizes[0]);
-    } else {
-      setSelectedSize('O/S');
-    }
-    
-    if (product.colors && product.colors.length > 0) {
-      setSelectedColor(product.colors[0]);
-    }
+    setSelectedSize('');
+    setSelectedColor(product.colors?.[0] || { name: 'Default', hex: '#111111' });
+    setSizeError(false);
+    setActiveImageIdx(0);
   }, [product]);
 
-  const handleAddClick = () => {
-    if (!selectedSize) {
-      alert("Please select a size first.");
+  const handleAdd = () => {
+    if (product.sizes?.length && !selectedSize) {
+      setSizeError(true);
       return;
     }
-    onAddToCart(product, selectedSize, selectedColor);
-    setAddedNotify(true);
-    setTimeout(() => setAddedNotify(false), 3000);
+    setSizeError(false);
+    onAddToCart(product, selectedSize || 'O/S', selectedColor);
   };
 
-  const toggleSection = (section: 'details' | 'composition' | 'care') => {
-    setExpandedSection(expandedSection === section ? null : section);
-  };
+  const hasDiscount = product.originalPrice && product.originalPrice > product.price;
+  const discountPercent = hasDiscount ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100) : 0;
 
-  // Find complementary look products (excluding self)
-  const complementaryLooks = React.useMemo(() => {
-    const productSource = products && products.length > 0 ? products : PRODUCTS;
-    return productSource.filter(p => p.id !== product.id).slice(0, 3);
+  const relatedProducts = React.useMemo(() => {
+    const source = products?.length ? products : PRODUCTS;
+    return source
+      .filter((p) => p.id !== product.id && p.category === product.category)
+      .slice(0, 3);
   }, [product, products]);
+
+  const toggleAccordion = (key: string) => setExpandedSection(expandedSection === key ? null : key);
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.35 }}
+      className="bg-[#F8F6F1] pb-16"
       id="product-detail-view-container"
-      className="max-w-7xl mx-auto px-4 md:px-8 py-10 space-y-16"
     >
-      {/* Return Navigation */}
-      <button
-        onClick={onBack}
-        className="flex items-center space-x-2 text-xs font-mono tracking-widest text-[#767676] hover:text-[#121212] transition-colors cursor-pointer"
-        id="detail-back-btn"
-      >
-        <ArrowLeft size={14} />
-        <span>BACK TO CAPSULE COLLECTIVE</span>
-      </button>
+      <div className="mx-auto max-w-[1280px] px-5 pt-5 sm:px-6 lg:px-8">
+        {/* Back nav */}
+        <button
+          onClick={onBack}
+          className="mb-6 inline-flex items-center gap-2 text-[13px] text-[#6B625A] transition hover:text-[#111111]"
+        >
+          <ArrowLeft size={16} strokeWidth={1.5} />
+          Back
+        </button>
 
-      {/* Hero Dual Container layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
-        
-        {/* Left column: High resolution dual images stacked */}
-        <div className="lg:col-span-7 space-y-6" id="detail-images-rack">
-          {displayImages.map((imgSrc, idx) => (
-            <div key={idx} className="aspect-[3/4] bg-[#F6F5F2] border border-[#E5E5E5] overflow-hidden">
-              <img
-                src={imgSrc}
-                alt={`${product.name} focus crop ${idx + 1}`}
-                className="w-full h-full object-cover grayscale brightness-95 hover:grayscale-0 transition-all duration-700 hover:scale-101"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          ))}
-        </div>
+        {/* Main grid: gallery left, info right */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.2fr_1fr] lg:gap-12 xl:gap-16">
 
-        {/* Right column: Sticky checkout panel selectors */}
-        <div className="lg:col-span-5" id="detail-options-panel">
-          <div className="lg:sticky lg:top-24 space-y-8 text-left">
-            
-            {/* Class definitions and price headings */}
-            <div className="space-y-2 border-b border-[#E5E5E5] pb-6">
-              <span className="font-mono text-[9px] tracking-widest text-[#767676] uppercase font-semibold">
-                STORY STUDIO SELECTION / ID: {product.id.slice(0,8).toUpperCase()}
-              </span>
-              
-              <h1 className="font-display font-medium text-3xl sm:text-4xl text-[#121212] tracking-tight uppercase">
-                {product.name}
-              </h1>
-              
-              <p className="font-mono text-lg font-semibold text-[#121212] pt-2">
-                {formatINR(product.price)}
-              </p>
-            </div>
-
-            {/* Description Statement */}
-            <p className="font-sans text-xs sm:text-sm text-[#5C5C60] leading-relaxed font-light">
-              {product.description || "Thoughtfully designed with clean proportions. Features minimal structural details, making it a highly modular addition to any wardrobe."}
-            </p>
-
-            {/* Color Selector */}
-            {product.colors && product.colors.length > 0 && (
-              <div className="space-y-3" id="detail-colors-selector">
-                <span className="font-mono text-[10px] tracking-widest text-[#767676] uppercase block font-semibold">
-                  SELECT COLOUR: <span className="text-[#121212] font-semibold">{selectedColor.name}</span>
-                </span>
-                
-                <div className="flex gap-3">
-                  {product.colors.map((c) => (
-                    <button
-                      key={c.name}
-                      onClick={() => setSelectedColor(c)}
-                      className={`w-7 h-7 relative border flex items-center justify-center cursor-pointer ${
-                        selectedColor.name === c.name ? 'border-[#121212]' : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: '#FFF' }}
-                      title={c.name}
-                    >
-                      {/* The actual colored dot */}
-                      <span
-                        className="w-4.5 h-4.5 block border border-gray-300"
-                        style={{ backgroundColor: c.hex }}
-                      />
-                      {selectedColor.name === c.name && (
-                        <span className="absolute -bottom-1 w-1 h-1 bg-[#121212]" />
-                      )}
-                    </button>
-                  ))}
+          {/* Gallery */}
+          <div className="space-y-3" id="detail-images-rack">
+            {gallery.length > 0 ? (
+              <>
+                <div className="aspect-[3/4] overflow-hidden rounded-lg border border-[#DDD8CF] bg-[#EFECE6]">
+                  <img
+                    src={gallery[activeImageIdx]}
+                    alt={product.name}
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
                 </div>
+                {gallery.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto">
+                    {gallery.map((img, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveImageIdx(idx)}
+                        className={`h-20 w-16 shrink-0 overflow-hidden rounded border transition ${
+                          idx === activeImageIdx ? 'border-[#111111]' : 'border-[#DDD8CF] hover:border-[#111111]'
+                        }`}
+                      >
+                        <img src={img} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex aspect-[3/4] items-center justify-center rounded-lg border border-[#DDD8CF] bg-[#EFECE6]">
+                <PackageSearch size={32} className="text-[#6B625A]" />
               </div>
             )}
+          </div>
 
-            {/* Size Selector */}
-            {product.sizes && product.sizes.length > 0 && (
-              <div className="space-y-3" id="detail-sizes-selector">
-                <div className="flex justify-between items-baseline">
-                  <span className="font-mono text-[10px] tracking-widest text-[#767676] uppercase block font-semibold">
-                    MEASURE CAPSULE: <span className="text-[#121212] font-semibold">{selectedSize}</span>
-                  </span>
-                  
-                  <button
-                    onClick={() => alert("Size Chart: Standard tailored guidelines. XS (Chest 34-36\"), S (Chest 36-38\"), M (Chest 38-40\"), L (Chest 40-42\"), XL (Chest 42-44\")")}
-                    className="font-mono text-[9px] tracking-wider text-[#767676] hover:text-[#121212] underline uppercase cursor-pointer"
-                  >
-                    SIZE GUIDANCE
-                  </button>
-                </div>
+          {/* Product info - sticky */}
+          <div className="lg:sticky lg:top-24 lg:self-start" id="detail-options-panel">
+            <div className="space-y-6">
 
-                {/* Grid of sizes - completely rectangular */}
-                <div className="grid grid-cols-4 gap-2">
-                  {product.sizes.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSelectedSize(s)}
-                      className={`py-3.5 border font-mono text-xs tracking-widest transition-all cursor-pointer ${
-                        selectedSize === s
-                          ? 'bg-[#121212] text-white border-[#121212]'
-                          : 'bg-white text-[#5C5C60] border-[#E5E5E5] hover:border-[#121212] hover:text-[#121212]'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+              {/* Meta + Title + Price */}
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.15em] text-[#6B625A]">{product.category}</p>
+                <h1 className="mt-2 font-display text-3xl font-bold text-[#111111] sm:text-4xl">{product.name}</h1>
+                <div className="mt-3 flex items-baseline gap-3">
+                  <span className="text-2xl font-bold text-[#111111]">{formatINR(product.price)}</span>
+                  {hasDiscount && (
+                    <>
+                      <span className="text-[15px] text-[#6B625A] line-through">{formatINR(product.originalPrice!)}</span>
+                      <span className="rounded bg-[#111111] px-2 py-0.5 text-[11px] font-semibold text-white">{discountPercent}% OFF</span>
+                    </>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Checkout Action Button - Sharp with loading state animation */}
-            <div className="space-y-4 pt-2">
-              <button
-                onClick={handleAddClick}
-                className="w-full bg-[#121212] hover:bg-black text-white text-xs font-mono tracking-widest font-semibold py-4.5 px-6 outline-none transition-colors duration-300 cursor-pointer flex items-center justify-center space-x-3"
-                id="add-to-cart-action-btn"
-              >
-                {addedNotify ? <Check size={14} /> : <ShoppingBag size={14} />}
-                <span>{addedNotify ? 'ARTICLE SECURED IN BAG' : 'ADD ASSEMBLY TO BAG'}</span>
-              </button>
-
-              {addedNotify && (
-                <p className="text-[10px] text-green-700 font-mono text-center tracking-widest uppercase">
-                  ADDED TO BAG. REVIEW YOUR SELECTION IN THE DRAWER.
-                </p>
+              {/* Description */}
+              {product.description && (
+                <p className="text-[15px] leading-relaxed text-[#6B625A]">{product.description}</p>
               )}
+
+              {/* Color selector */}
+              {product.colors && product.colors.length > 0 && (
+                <div>
+                  <p className="mb-3 text-[12px] font-medium text-[#111111]">
+                    Color: <span className="text-[#6B625A]">{selectedColor.name}</span>
+                  </p>
+                  <div className="flex gap-2">
+                    {product.colors.map((c) => (
+                      <button
+                        key={c.name}
+                        type="button"
+                        onClick={() => setSelectedColor(c)}
+                        className={`h-9 w-9 rounded-full border-2 transition ${
+                          selectedColor.name === c.name ? 'border-[#111111]' : 'border-[#DDD8CF] hover:border-[#111111]'
+                        }`}
+                        title={c.name}
+                      >
+                        <span className="block h-full w-full rounded-full" style={{ backgroundColor: c.hex }} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Size selector */}
+              {product.sizes && product.sizes.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-[12px] font-medium text-[#111111]">
+                      Size: <span className="text-[#6B625A]">{selectedSize || 'Select'}</span>
+                    </p>
+                    <button type="button" className="text-[12px] text-[#6B625A] underline transition hover:text-[#111111]">
+                      Size Guide
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                    {product.sizes.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => { setSelectedSize(s); setSizeError(false); }}
+                        className={`h-11 rounded border text-[13px] font-medium transition ${
+                          selectedSize === s
+                            ? 'border-[#111111] bg-[#111111] text-white'
+                            : 'border-[#DDD8CF] bg-white text-[#111111] hover:border-[#111111]'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  {sizeError && (
+                    <p className="mt-2 text-[13px] font-medium text-red-600">Please select a size.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Delivery + returns notes */}
+              <div className="flex flex-col gap-3 rounded-lg border border-[#DDD8CF] bg-white p-4">
+                <div className="flex items-center gap-3 text-[13px] text-[#6B625A]">
+                  <Truck size={16} strokeWidth={1.5} className="text-[#111111]" />
+                  Delivery in 4–7 business days across India
+                </div>
+                <div className="flex items-center gap-3 text-[13px] text-[#6B625A]">
+                  <RotateCcw size={16} strokeWidth={1.5} className="text-[#111111]" />
+                  Easy returns & exchanges within 7 days
+                </div>
+              </div>
+
+              {/* Add to Bag / Quantity stepper */}
+              <div>
+                {cartQty === 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleAdd}
+                    className="flex h-14 w-full items-center justify-center gap-3 bg-[#111111] text-[14px] font-semibold tracking-wide text-white transition hover:bg-black"
+                    id="add-to-cart-action-btn"
+                  >
+                    <ShoppingBag size={18} strokeWidth={1.6} />
+                    Add to Bag
+                  </button>
+                ) : (
+                  <div className="flex h-14 items-center overflow-hidden border border-[#111111]">
+                    <button
+                      type="button"
+                      onClick={() => cartQty === 1 ? onRemoveItem(cartItemId) : onUpdateQuantity(cartItemId, -1)}
+                      className="flex h-full w-14 items-center justify-center border-r border-[#DDD8CF] text-[#111111] transition hover:bg-[#EFECE6]"
+                    >
+                      <Minus size={18} />
+                    </button>
+                    <div className="flex flex-1 items-center justify-center gap-2 text-[15px] font-semibold text-[#111111]">
+                      <ShoppingBag size={16} /> {cartQty} in Bag
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onUpdateQuantity(cartItemId, 1)}
+                      className="flex h-full w-14 items-center justify-center border-l border-[#DDD8CF] text-[#111111] transition hover:bg-[#EFECE6]"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Accordion */}
+              <div className="divide-y divide-[#DDD8CF] border-y border-[#DDD8CF]">
+                <AccordionItem
+                  title="Product Details"
+                  isOpen={expandedSection === 'details'}
+                  onToggle={() => toggleAccordion('details')}
+                >
+                  {product.details ? (
+                    <ul className="list-disc space-y-1.5 pl-4 text-[14px] leading-relaxed text-[#6B625A]">
+                      {product.details.map((item, idx) => <li key={idx}>{item}</li>)}
+                    </ul>
+                  ) : (
+                    <p className="text-[14px] leading-relaxed text-[#6B625A]">Premium construction with attention to fit and finish.</p>
+                  )}
+                </AccordionItem>
+
+                <AccordionItem
+                  title="Fabric & Care"
+                  isOpen={expandedSection === 'fabric'}
+                  onToggle={() => toggleAccordion('fabric')}
+                >
+                  <div className="space-y-3 text-[14px] leading-relaxed text-[#6B625A]">
+                    {product.composition && <p><span className="font-medium text-[#111111]">Composition:</span> {product.composition}</p>}
+                    {product.care && <p><span className="font-medium text-[#111111]">Care:</span> {product.care}</p>}
+                    {!product.composition && !product.care && <p>Premium materials. Dry clean recommended.</p>}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  title="Delivery & Returns"
+                  isOpen={expandedSection === 'delivery'}
+                  onToggle={() => toggleAccordion('delivery')}
+                >
+                  <div className="space-y-2 text-[14px] leading-relaxed text-[#6B625A]">
+                    <p>Standard delivery: 4–7 business days across India.</p>
+                    <p>Free shipping on orders above ₹5,000.</p>
+                    <p>Returns accepted within 7 days of delivery for unused items with tags.</p>
+                  </div>
+                </AccordionItem>
+              </div>
+
             </div>
-
-            {/* Collapsible Accordions: Details, Composition, Care */}
-            <div className="border-t border-[#E5E5E5] divide-y divide-[#E5E5E5]" id="detail-specs-accordions">
-              
-              {/* DETAILS Accordion */}
-              <div className="py-4">
-                <button
-                  onClick={() => toggleSection('details')}
-                  className="w-full flex justify-between items-center text-left cursor-pointer"
-                >
-                  <span className="font-mono text-[10px] tracking-widest text-[#121212] font-semibold">01 / STRUCTURAL DETAILS</span>
-                  {expandedSection === 'details' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-                {expandedSection === 'details' && (
-                  <div className="mt-4 pl-4 text-xs text-[#5C5C60] font-sans leading-relaxed space-y-1.5 font-light">
-                    {product.details ? (
-                      <ul className="list-disc pl-4 space-y-1">
-                        {product.details.map((item, idx) => (
-                          <li key={idx}>{item}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p>Features bespoke tailored margins, heavy weight support panels, and minimalist zero-waste outline shapes.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* COMPOSITION Accordion */}
-              <div className="py-4">
-                <button
-                  onClick={() => toggleSection('composition')}
-                  className="w-full flex justify-between items-center text-left cursor-pointer"
-                >
-                  <span className="font-mono text-[10px] tracking-widest text-[#121212] font-semibold">02 / TEXTURE & ETHICAL COMPOSITION</span>
-                  {expandedSection === 'composition' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-                {expandedSection === 'composition' && (
-                  <div className="mt-4 pl-4 text-xs text-[#5C5C60] font-sans leading-relaxed font-light">
-                    <p>{product.composition || "Made with premium materials sourced through Indian textile partners and finished in responsible ateliers across India."}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* CARE Accordion */}
-              <div className="py-4">
-                <button
-                  onClick={() => toggleSection('care')}
-                  className="w-full flex justify-between items-center text-left cursor-pointer"
-                >
-                  <span className="font-mono text-[10px] tracking-widest text-[#121212] font-semibold">03 / FABRIC CONSERVATION CARE</span>
-                  {expandedSection === 'care' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-                {expandedSection === 'care' && (
-                  <div className="mt-4 pl-4 text-xs text-[#5C5C60] font-sans leading-relaxed font-light">
-                    <p>{product.care || "Dry clean only using mild organic solvants. Avoid hot water washes, aggressive spins, or iron steamer contact. Hang to maintain silhouette drape."}</p>
-                  </div>
-                )}
-              </div>
-
-            </div>
-
           </div>
         </div>
 
-      </div>
-
-      {/* COMPLETE THE LOOK Section */}
-      <section className="pt-12 border-t border-[#E5E5E5]" id="detail-complementary-section">
-        <div className="mb-6">
-          <span className="font-mono text-[9px] tracking-widest text-[#767676] font-semibold">STORY STYLING PROTOCOL</span>
-          <h3 className="font-display font-medium text-lg tracking-wider text-[#121212] uppercase mt-1">COMPLETE THE LOOK</h3>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          {complementaryLooks.map((item) => (
-            <div
-              key={`look-${item.id}`}
-              onClick={() => {
-                onSelectProduct(item);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="flex items-center space-x-4 border border-[#E5E5E5] p-3 hover:border-[#121212] cursor-pointer transition-colors bg-white"
-              id={`look-card-${item.id}`}
-            >
-              {/* Image crop */}
-              <div className="w-16 h-20 bg-[#F6F5F2] border border-[#E5E5E5] shrink-0 overflow-hidden">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="w-full h-full object-cover grayscale brightness-95"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-
-              {/* Specs */}
-              <div className="space-y-0.5 text-left truncate">
-                <span className="font-mono text-[8px] text-[#767676] tracking-widest uppercase block">{item.category}</span>
-                <h4 className="font-sans font-medium text-xs text-[#121212] truncate uppercase">{item.name}</h4>
-                <p className="font-mono text-xs text-[#121212] font-semibold">{formatINR(item.price)}</p>
-                <span className="font-mono text-[9px] text-gray-400 block tracking-wider underline group-hover:text-black">CO-STYLED</span>
-              </div>
+        {/* Complete the Look */}
+        {relatedProducts.length > 0 && (
+          <section className="mt-16 border-t border-[#DDD8CF] pt-12">
+            <div className="mb-8">
+              <p className="text-[11px] uppercase tracking-[0.15em] text-[#6B625A]">You may also like</p>
+              <h3 className="mt-2 font-display text-2xl font-bold text-[#111111]">Complete the Look</h3>
             </div>
-          ))}
-        </div>
-      </section>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {relatedProducts.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => { onSelectProduct(item); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="group flex items-center gap-4 rounded-lg border border-[#DDD8CF] bg-white p-3 text-left transition hover:border-[#111111]"
+                >
+                  <div className="h-24 w-20 shrink-0 overflow-hidden rounded bg-[#EFECE6]">
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center"><PackageSearch size={18} className="text-[#6B625A]" /></div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] uppercase tracking-wide text-[#6B625A]">{item.category}</p>
+                    <h4 className="mt-1 truncate text-[14px] font-semibold text-[#111111]">{item.name}</h4>
+                    <p className="mt-1 text-[14px] font-bold text-[#111111]">{formatINR(item.price)}</p>
+                  </div>
+                  <ArrowRight size={16} className="shrink-0 text-[#DDD8CF] transition group-hover:text-[#111111]" />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
     </motion.div>
   );
 };
+
+function AccordionItem({ title, isOpen, onToggle, children }: { title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <div className="py-4">
+      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between text-left">
+        <span className="text-[14px] font-semibold text-[#111111]">{title}</span>
+        {isOpen ? <ChevronUp size={16} className="text-[#6B625A]" /> : <ChevronDown size={16} className="text-[#6B625A]" />}
+      </button>
+      {isOpen && <div className="mt-4">{children}</div>}
+    </div>
+  );
+}

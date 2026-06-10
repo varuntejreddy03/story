@@ -215,7 +215,7 @@ const CategoryCard: React.FC<{
         )}
       </span>
       <span className="mt-3 flex items-center justify-between gap-3 border-t border-[#ece9e1] pt-3 font-mono text-[9px] uppercase tracking-widest text-[#5f5b52]">
-        {countLabel(count, 'piece', 'pieces')}
+        {count > 0 ? countLabel(count, 'piece', 'pieces') : 'Coming soon'}
         <ArrowRight size={13} />
       </span>
     </span>
@@ -556,17 +556,20 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
               All collections
             </button>
           </div>
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 md:grid-cols-3 xl:grid-cols-4">
-            {categoryOptions.map((category, index) => (
-              <CategoryCard
-                key={category.id}
-                category={category}
-                selected={activeCategory?.id === category.id}
-                count={categoryCounts.get(category.slug) || 0}
-                fallbackImage={FALLBACK_CATEGORY_IMAGES[index % FALLBACK_CATEGORY_IMAGES.length]}
-                onClick={() => setCategoryFilter(category.slug)}
-              />
-            ))}
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 md:grid-cols-3 lg:grid-cols-4">
+            {categoryOptions.map((category, index) => {
+              const count = categoryCounts.get(category.slug) || 0;
+              return (
+                <CategoryCard
+                  key={category.id}
+                  category={category}
+                  selected={activeCategory?.id === category.id}
+                  count={count}
+                  fallbackImage={FALLBACK_CATEGORY_IMAGES[index % FALLBACK_CATEGORY_IMAGES.length]}
+                  onClick={() => setCategoryFilter(category.slug)}
+                />
+              );
+            })}
           </div>
         </section>
 
@@ -618,17 +621,24 @@ export const DiscoverView: React.FC<DiscoverViewProps> = ({ onSelectProduct, pro
         </section>
 
         {filteredProducts.length > 0 ? (
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5" id="categories-grid-collection-view">
-            {filteredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                categories={categoryOptions}
-                fallbackImage={heroImage}
-                onSelectProduct={onSelectProduct}
-              />
-            ))}
-          </div>
+          <>
+            <div className={`mt-5 grid gap-3 sm:gap-4 ${filteredProducts.length <= 2 ? 'grid-cols-2 max-w-2xl mx-auto' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`} id="categories-grid-collection-view">
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  categories={categoryOptions}
+                  fallbackImage={heroImage}
+                  onSelectProduct={onSelectProduct}
+                />
+              ))}
+            </div>
+            {filteredProducts.length <= 4 && (
+              <div className="mt-6 rounded-lg border border-dashed border-[#DDD8CF] bg-white p-6 text-center">
+                <p className="text-[14px] text-[#6B625A]">More edits coming soon — new drops every week.</p>
+              </div>
+            )}
+          </>
         ) : (
           <div className="mt-5 rounded-xl border border-dashed border-[#cfcac0] bg-white px-6 py-16 text-center shadow-sm" id="discover-empty-state">
             <Sparkles className="mx-auto text-[#111111]" size={26} strokeWidth={1.4} />

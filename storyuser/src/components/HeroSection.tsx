@@ -1,6 +1,5 @@
 import { ArrowRight } from 'lucide-react';
 import { StorefrontContent } from '../types';
-import { BrandLogoMarquee } from './BrandLogoMarquee';
 import { HeroImageSlider } from './HeroImageSlider';
 
 interface HeroSectionProps {
@@ -11,42 +10,49 @@ interface HeroSectionProps {
 
 export function HeroSection({ content, onShopEdit, onViewLookbook }: HeroSectionProps) {
   return (
-    <>
-      <section
-        className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-8 overflow-hidden px-4 pb-8 pt-4 sm:px-6 sm:pt-5 md:pt-7 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12 lg:px-8 lg:pt-8"
-        id="editorial-hero"
-      >
-        <div className="max-w-3xl space-y-7">
-          <p className="font-mono text-[10px] uppercase text-[#6f6f6f]">
+    <section
+      className="relative mx-auto flex max-w-[1280px] items-center px-5 sm:px-6 lg:px-8"
+      style={{ minHeight: 'min(680px, calc(100vh - 140px))' }}
+      id="editorial-hero"
+    >
+      <div className="grid w-full grid-cols-1 items-center gap-8 py-10 lg:grid-cols-[0.45fr_0.55fr] lg:gap-12 lg:py-0">
+
+        {/* Left: content */}
+        <div className="max-w-[480px]">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#6B625A]">
             {content.heroEyebrow || 'NEW EDITORIAL CAPSULE'}
           </p>
-          <h1 className="font-display text-[clamp(3.4rem,18vw,5.25rem)] font-black uppercase leading-none text-[#050505] sm:text-7xl lg:text-8xl">
-            {content.heroTitle || 'OUR LATEST STORY'}
+
+          <h1 className="mt-5 font-display text-[clamp(2.75rem,8vw,6.5rem)] font-black leading-[0.97] text-[#111111]">
+            {content.heroTitle || 'Our Latest Story'}
           </h1>
-          <p className="max-w-sm text-sm leading-6 text-[#4c4c4c]">
-            {content.heroBody || 'Discover verified branded fashion, curated in India for everyday premium style.'}
+
+          <p className="mt-5 max-w-[380px] text-[15px] leading-[1.7] text-[#6B625A]">
+            {content.heroBody || 'Verified branded fashion, curated in India for everyday premium style.'}
           </p>
-          <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
+
+          <div className="mt-7 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={onShopEdit}
-              className="group inline-flex w-full items-center justify-center gap-3 bg-[#111111] px-7 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-white shadow-[0_4px_20px_rgba(0,0,0,0.15)] transition hover:bg-black hover:shadow-[0_6px_28px_rgba(0,0,0,0.25)] sm:w-auto"
+              className="group inline-flex h-[52px] items-center gap-3 bg-[#111111] px-7 text-[13px] font-semibold tracking-wide text-white transition hover:bg-black"
             >
-              {content.heroPrimaryCta || 'EXPLORE COLLECTION'}
-              <ArrowRight size={14} strokeWidth={1.6} className="transition-transform duration-300 group-hover:translate-x-1" />
+              {content.heroPrimaryCta || 'Shop New Arrivals'}
+              <ArrowRight size={15} strokeWidth={2} className="transition-transform duration-300 group-hover:translate-x-1" />
             </button>
             <button
               type="button"
               onClick={onViewLookbook}
-              className="group inline-flex w-full items-center justify-center gap-3 border border-[#111111] bg-transparent px-7 py-4 font-mono text-[10px] uppercase tracking-[0.18em] text-[#111111] transition hover:bg-[#111111] hover:text-white sm:w-auto"
+              className="group inline-flex h-[52px] items-center gap-3 border border-[#111111] px-7 text-[13px] font-semibold tracking-wide text-[#111111] transition hover:bg-[#111111] hover:text-white"
             >
-              {content.heroSecondaryCta || 'VIEW STYLE DIARY'}
-              <ArrowRight size={14} strokeWidth={1.6} className="transition-transform duration-300 group-hover:translate-x-1" />
+              {content.heroSecondaryCta || 'View Lookbook'}
+              <ArrowRight size={15} strokeWidth={2} className="transition-transform duration-300 group-hover:translate-x-1" />
             </button>
           </div>
         </div>
 
-        <div className="min-w-0" aria-label="STORY editorial image slider">
+        {/* Right: editorial image */}
+        <div className="relative min-w-0 lg:flex lg:justify-end">
           <HeroImageSlider
             images={[
               content.heroImagePrimary,
@@ -58,9 +64,7 @@ export function HeroSection({ content, onShopEdit, onViewLookbook }: HeroSection
             ]}
           />
         </div>
-      </section>
-
-      <BrandLogoMarquee />
-    </>
+      </div>
+    </section>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, CalendarCheck, Mail, MessageCircle, Phone, Ruler, Send, Truck } from 'lucide-react';
+import { ArrowRight, CalendarCheck, Mail, MessageCircle, Ruler, Send, Truck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ActiveScreen } from '../types';
 
@@ -16,22 +16,25 @@ interface ContactViewProps {
 
 const CONTACT_METHODS = [
   {
-    icon: Mail,
-    label: 'Email',
-    value: 'care@story.in',
-    note: 'Client care and order support'
-  },
-  {
-    icon: Phone,
-    label: 'Phone',
-    value: '+91 98765 43210',
-    note: 'Monday to Saturday, 10 AM to 7 PM IST'
-  },
-  {
     icon: MessageCircle,
-    label: 'WhatsApp',
+    label: 'WhatsApp Support',
     value: '+91 98765 43210',
-    note: 'Styling appointments and delivery updates'
+    note: 'Chat for quick help with orders and sizing',
+    cta: 'Chat on WhatsApp'
+  },
+  {
+    icon: Mail,
+    label: 'Email Support',
+    value: 'care@story.in',
+    note: 'Detailed queries, returns, and order issues',
+    cta: 'Email Us'
+  },
+  {
+    icon: Truck,
+    label: 'Order Help',
+    value: 'Track your order',
+    note: 'Check delivery status and shipping updates',
+    cta: 'Track Order'
   }
 ];
 
@@ -52,7 +55,8 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen, onSub
     name: '',
     email: '',
     phone: '',
-    topic: 'STYLING APPOINTMENT',
+    orderId: '',
+    topic: 'Size help',
     message: ''
   });
 
@@ -68,7 +72,8 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen, onSub
         name: '',
         email: '',
         phone: '',
-        topic: 'STYLING APPOINTMENT',
+        orderId: '',
+        topic: 'Size help',
         message: ''
       });
     } catch (error) {
@@ -84,33 +89,36 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen, onSub
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.45 }}
-      className="bg-[#f5f4f0] pb-16 text-[#111111]"
+      className="bg-[#F8F6F1] pb-16 text-[#111111]"
       id="contact-view-container"
     >
       <section className="mx-auto max-w-screen-xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8 lg:py-16">
         <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_430px] lg:gap-12">
           <div className="min-w-0">
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6f6f6f]">Contact STORY India</p>
-            <h1 className="mt-4 max-w-4xl font-display text-5xl font-black uppercase leading-[0.92] text-[#050505] sm:text-6xl lg:text-7xl">
-              Begin The Conversation
+            <p className="text-[11px] uppercase tracking-[0.15em] text-[#6B625A]">Contact STORY India</p>
+            <h1 className="mt-3 font-display text-4xl font-bold text-[#111111] sm:text-5xl">
+              Contact STORY
             </h1>
-            <p className="mt-6 max-w-2xl text-sm leading-7 text-[#4c4c4c] sm:text-base">
-              For styling appointments, order assistance, returns, press requests, or private collection previews, reach the STORY India client care desk.
+            <p className="mt-4 max-w-lg text-[15px] leading-7 text-[#6B625A]">
+              Need help with sizing, delivery, returns, or your order? We'll help you quickly.
             </p>
 
-            <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              {CONTACT_METHODS.map(({ icon: Icon, label, value, note }) => (
-                <div key={label} className="rounded-lg border border-[#deded9] bg-white p-4 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#deded9] bg-[#fafafa]">
-                      <Icon size={17} strokeWidth={1.6} />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#6f6f6f]">{label}</p>
-                      <p className="mt-1 break-words text-sm font-semibold text-[#111111]">{value}</p>
-                      <p className="mt-2 text-xs leading-5 text-[#5a5a55]">{note}</p>
-                    </div>
+            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {CONTACT_METHODS.map(({ icon: Icon, label, value, note, cta }) => (
+                <div key={label} className="rounded-lg border border-[#DDD8CF] bg-white p-5 shadow-sm">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EFECE6]">
+                    <Icon size={18} strokeWidth={1.5} />
                   </div>
+                  <h3 className="mt-4 text-[14px] font-semibold text-[#111111]">{label}</h3>
+                  <p className="mt-1 text-[14px] font-medium text-[#111111]">{value}</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-[#6B625A]">{note}</p>
+                  <button
+                    type="button"
+                    className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded border border-[#111111] bg-[#111111] px-4 text-[12px] font-semibold text-white transition hover:bg-black"
+                  >
+                    {cta}
+                    <ArrowRight size={13} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -197,17 +205,28 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen, onSub
               </label>
 
               <label className="block">
+                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#6f6f6f]">Order ID <span className="text-[#9a9a95]">(optional)</span></span>
+                <input
+                  value={formState.orderId}
+                  onChange={(event) => setFormState((state) => ({ ...state, orderId: event.target.value }))}
+                  className="mt-2 h-11 w-full rounded-lg border border-[#d7d5ce] bg-[#fafafa] px-3 text-sm text-[#111111] placeholder:text-[#9a9a95] focus:border-[#111111] focus:bg-white"
+                  placeholder="ST-XXXXXXXX"
+                />
+              </label>
+
+              <label className="block">
                 <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#6f6f6f]">Topic</span>
                 <select
                   value={formState.topic}
                   onChange={(event) => setFormState((state) => ({ ...state, topic: event.target.value }))}
                   className="mt-2 h-11 w-full rounded-lg border border-[#d7d5ce] bg-[#fafafa] px-3 text-xs font-semibold text-[#111111] focus:border-[#111111] focus:bg-white"
                 >
-                  <option>STYLING APPOINTMENT</option>
-                  <option>ORDER SUPPORT</option>
-                  <option>RETURNS</option>
-                  <option>PRESS</option>
-                  <option>COLLABORATION</option>
+                  <option value="Size help">Size help</option>
+                  <option value="Delivery">Delivery</option>
+                  <option value="Return/Exchange">Return / Exchange</option>
+                  <option value="Product question">Product question</option>
+                  <option value="Order support">Order support</option>
+                  <option value="Other">Other</option>
                 </select>
               </label>
 
@@ -228,7 +247,7 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen, onSub
               disabled={submitting}
               className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#111111] px-5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? 'Sending...' : 'Send Request'}
+              {submitting ? 'Sending...' : 'Send Message'}
               <ArrowRight size={14} strokeWidth={1.7} />
             </button>
           </form>
@@ -262,6 +281,31 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActiveScreen, onSub
               View Collections
               <ArrowRight size={14} strokeWidth={1.7} />
             </button>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="mx-auto max-w-screen-xl px-4 pb-12 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl">
+          <h2 className="text-center font-display text-2xl font-bold text-[#111111] sm:text-3xl">Frequently Asked Questions</h2>
+          <p className="mt-3 text-center text-[14px] text-[#6B625A]">Quick answers to common questions.</p>
+
+          <div className="mt-8 divide-y divide-[#DDD8CF] rounded-lg border border-[#DDD8CF] bg-white">
+            {[
+              { q: 'How long does delivery take?', a: 'Standard delivery takes 4–7 business days across India. Orders above ₹5,000 get free shipping.' },
+              { q: 'Are products verified?', a: 'Yes. Every piece is checked for brand authenticity, condition, and quality before listing on STORY.' },
+              { q: 'Can I return or exchange?', a: 'Returns and exchanges are accepted within 7 days of delivery for unused items with original tags and packaging.' },
+              { q: 'How do I choose my size?', a: 'Each product page shows available sizes. Use the Size Guide link or contact us on WhatsApp for fit advice.' }
+            ].map((faq) => (
+              <details key={faq.q} className="group">
+                <summary className="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-[15px] font-medium text-[#111111]">
+                  {faq.q}
+                  <span className="shrink-0 text-lg text-[#6B625A] transition group-open:rotate-45">+</span>
+                </summary>
+                <p className="px-5 pb-4 text-[14px] leading-relaxed text-[#6B625A]">{faq.a}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>

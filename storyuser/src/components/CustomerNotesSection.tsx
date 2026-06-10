@@ -167,14 +167,14 @@ export function CustomerNotesSection() {
   };
 
   return (
-    <section className="bg-[#eeeeec] px-4 py-10 text-[#111111] sm:px-6 sm:py-12 lg:px-8 lg:py-20" aria-label="Customer notes">
-      <div className="mx-auto max-w-[1200px]">
-        <div className="mx-auto mb-8 max-w-2xl text-center lg:mb-10">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#6f6f6f]">Customer Notes</p>
-          <h2 className="mt-3 font-display text-[clamp(2.125rem,8vw,4.25rem)] font-black uppercase leading-[0.95] tracking-normal text-black">
+    <section className="bg-[#EFECE6] px-5 py-14 text-[#111111] sm:px-6 sm:py-16 lg:px-8 lg:py-20" aria-label="Customer notes">
+      <div className="mx-auto max-w-[1280px]">
+        <div className="mx-auto mb-8 max-w-2xl text-center">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-[#6B625A]">Customer Notes</p>
+          <h2 className="mt-3 font-display text-3xl font-black text-[#111111] sm:text-4xl">
             What Our Customers Say
           </h2>
-          <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-[#555555]">
+          <p className="mx-auto mt-3 max-w-md text-[14px] leading-relaxed text-[#6B625A]">
             Real words from shoppers who found their perfect STORY piece.
           </p>
         </div>
@@ -190,19 +190,19 @@ export function CustomerNotesSection() {
                 key={`${testimonial.name}-${index}`}
                 className="w-full shrink-0 sm:w-[calc((100%_-_1.5rem)_/_2)] lg:w-[calc((100%_-_3rem)_/_3)]"
               >
-                <div className="flex min-h-[240px] flex-col border border-black/20 bg-[#f7f7f4] p-6 text-left transition duration-300 hover:-translate-y-1 hover:border-[#111111] hover:bg-white sm:min-h-[280px] sm:p-7 lg:min-h-[300px] lg:p-8">
-                  <div className="flex items-start justify-between gap-4">
-                    <h3 className="font-display text-2xl font-bold leading-none text-black sm:text-[1.625rem] lg:text-[1.75rem]">
+                <div className="flex h-full flex-col rounded-lg border border-[#DDD8CF] bg-white p-5 text-left transition duration-300 hover:-translate-y-0.5 hover:shadow-md sm:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-[15px] font-semibold text-[#111111]">
                       {testimonial.name}
                     </h3>
-                    <span className="shrink-0 border border-black/20 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#6f6f6f]">
+                    <span className="shrink-0 rounded-full bg-[#EFECE6] px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-[#6B625A]">
                       {testimonial.tag}
                     </span>
                   </div>
-                  <div className="mt-5">
+                  <div className="mt-3">
                     <RatingStars rating={testimonial.rating} />
                   </div>
-                  <p className="mt-5 max-w-[360px] text-[15px] leading-[1.6] text-[#333333] sm:text-[17px] lg:text-[18px]">
+                  <p className="mt-3 flex-1 text-[14px] leading-[1.65] text-[#6B625A]">
                     &ldquo;{testimonial.review}&rdquo;
                   </p>
                 </div>
@@ -210,12 +210,12 @@ export function CustomerNotesSection() {
             ))}
           </div>
 
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={goToPrevious}
               aria-label="Previous testimonial"
-              className="inline-flex h-[42px] w-[42px] items-center justify-center border border-black/20 bg-white text-[#111111] transition hover:border-[#111111] hover:bg-[#111111] hover:text-white"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#DDD8CF] bg-white text-[#111111] transition hover:border-[#111111] hover:bg-[#111111] hover:text-white"
             >
               <ArrowLeft size={15} strokeWidth={1.6} />
             </button>
@@ -223,7 +223,7 @@ export function CustomerNotesSection() {
               type="button"
               onClick={goToNext}
               aria-label="Next testimonial"
-              className="inline-flex h-[42px] w-[42px] items-center justify-center border border-black/20 bg-white text-[#111111] transition hover:border-[#111111] hover:bg-[#111111] hover:text-white"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#DDD8CF] bg-white text-[#111111] transition hover:border-[#111111] hover:bg-[#111111] hover:text-white"
             >
               <ArrowRight size={15} strokeWidth={1.6} />
             </button>
@@ -233,9 +233,9 @@ export function CustomerNotesSection() {
                 setIsModalOpen(true);
                 setSubmitted(false);
               }}
-              className="inline-flex h-[42px] items-center justify-center border border-[#111111] bg-[#111111] px-6 font-mono text-[10px] uppercase tracking-[0.18em] text-white transition hover:bg-white hover:text-[#111111]"
+              className="inline-flex h-10 items-center gap-2 bg-[#111111] px-5 text-[12px] font-semibold text-white transition hover:bg-black"
             >
-              Write a Review <ArrowRight size={13} strokeWidth={1.6} className="ml-2" />
+              Write a Review <ArrowRight size={13} strokeWidth={1.6} />
             </button>
           </div>
         </div>

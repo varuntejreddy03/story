@@ -1,9 +1,11 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Truck, RotateCcw, Headphones, Star } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Category, Product, StorefrontContent } from '../types';
 import { PRODUCTS } from '../data';
+import { formatINR } from '../utils/currency';
 import { HeroSection } from './HeroSection';
+import { BrandLogoMarquee } from './BrandLogoMarquee';
 import { CustomerNotesSection } from './CustomerNotesSection';
 
 interface ShopViewProps {
@@ -15,139 +17,10 @@ interface ShopViewProps {
   content: StorefrontContent;
 }
 
-const fallbackCategoryImages = [
-  'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=85',
-  'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=900&q=85',
-  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85'
-];
-
-function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false);
-
-  React.useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches);
-
-    updatePreference();
-    mediaQuery.addEventListener('change', updatePreference);
-    return () => mediaQuery.removeEventListener('change', updatePreference);
-  }, []);
-
-  return prefersReducedMotion;
-}
-
-function CategoryImageRotator({ category, fallbackImage }: { category: Category; fallbackImage: string }) {
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const [activeIndex, setActiveIndex] = React.useState(0);
-  const [isPaused, setIsPaused] = React.useState(false);
-  const [isMobile, setIsMobile] = React.useState(false);
-  const imageEntries = React.useMemo(() => {
-    const entries = [category.image, fallbackImage].filter(Boolean);
-    return Array.from(new Set(entries));
-  }, [category.image, fallbackImage]);
-
-  React.useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 639px)');
-    const updateMobile = () => setIsMobile(mediaQuery.matches);
-
-    updateMobile();
-    mediaQuery.addEventListener('change', updateMobile);
-    return () => mediaQuery.removeEventListener('change', updateMobile);
-  }, []);
-
-  React.useEffect(() => {
-    if (imageEntries.length < 2 || prefersReducedMotion || isPaused) return undefined;
-
-    const timer = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % imageEntries.length);
-    }, isMobile ? 5000 : 4000);
-
-    return () => window.clearInterval(timer);
-  }, [imageEntries.length, isMobile, isPaused, prefersReducedMotion]);
-
-  if (imageEntries.length === 0) return null;
-
-  return (
-    <span
-      className="absolute inset-0"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-      onPointerDown={() => setIsPaused(true)}
-      onPointerUp={() => setIsPaused(false)}
-    >
-      {imageEntries.map((src, index) => (
-        <img
-          key={`${category.id}-${src}`}
-          src={src}
-          alt=""
-          aria-hidden="true"
-          className={`absolute inset-0 h-full w-full object-cover grayscale contrast-[1.03] brightness-[1.08] transition duration-700 ${
-            index === activeIndex ? 'opacity-100' : 'opacity-0'
-          } object-top`}
-          loading={index === 0 ? 'eager' : 'lazy'}
-          referrerPolicy="no-referrer"
-          onError={(event) => {
-            event.currentTarget.style.display = 'none';
-          }}
-        />
-      ))}
-    </span>
-  );
-}
-
-function CategoryCard({
-  category,
-  fallbackImage,
-  featured = false,
-  onOpenCategory,
-  className = ''
-}: {
-  key?: React.Key;
-  category: Category & { count: number };
-  fallbackImage: string;
-  featured?: boolean;
-  onOpenCategory: (categorySlug: string) => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onOpenCategory(category.slug)}
-      aria-label={`Open ${category.name} category`}
-      className={`group relative min-h-[260px] overflow-hidden bg-[#f1f0ec] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white ${
-        featured ? 'sm:min-h-[360px] lg:min-h-0' : 'sm:min-h-[260px] lg:min-h-0'
-      } ${className}`}
-    >
-      <span className="absolute inset-0 transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.03]">
-        <CategoryImageRotator category={category} fallbackImage={fallbackImage} />
-      </span>
-      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(0,0,0,0.78)] from-0% via-[rgba(0,0,0,0.24)] via-[48%] to-transparent to-[72%] transition duration-500 group-hover:from-[rgba(0,0,0,0.86)]" />
-      <span className="pointer-events-none absolute bottom-0 left-0 right-0 p-5 text-white sm:p-6">
-        <span className="mb-2 block font-mono text-[0.58rem] uppercase tracking-[0.18em] text-white/70">
-          {category.count} pieces
-        </span>
-        <span
-          className={`mb-[0.35rem] block font-medium uppercase leading-none tracking-[0.1em] text-white ${
-            featured ? 'text-xl' : 'text-sm'
-          }`}
-        >
-          {category.name}
-        </span>
-        <span className="mt-2 line-clamp-2 max-w-[18rem] text-xs leading-5 text-white/76">
-          {category.description || 'Explore STORY pieces selected for this category.'}
-        </span>
-        <span className="mt-4 block translate-y-1.5 font-mono text-[0.625rem] uppercase tracking-[0.15em] text-white/72 opacity-0 transition duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100">
-          Shop Category <ArrowRight size={12} strokeWidth={1.5} className="ml-1 inline-block align-[-2px]" />
-        </span>
-      </span>
-    </button>
-  );
-}
-
 const productMatchesCategory = (product: Product, category: Category) =>
   product.categoryId === category.id || product.category.toLowerCase() === category.name.toLowerCase();
 
-export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCategory, products, categories = [], content }) => {
+export const ShopView: React.FC<ShopViewProps> = ({ onSelectProduct, setActiveScreen, onOpenCategory, products, categories = [], content }) => {
   const productSource = products && products.length > 0 ? products : PRODUCTS;
 
   const scrollToProducts = () => {
@@ -157,101 +30,201 @@ export const ShopView: React.FC<ShopViewProps> = ({ setActiveScreen, onOpenCateg
   };
 
   const categoryTiles = React.useMemo(() => categories
-    .filter((category) => category.isActive !== false)
-    .slice()
+    .filter((c) => c.isActive !== false)
     .sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name))
-    .map((category) => ({
-      ...category,
-      count: productSource.filter((product) => productMatchesCategory(product, category)).length
+    .map((c) => ({
+      ...c,
+      count: productSource.filter((p) => productMatchesCategory(p, c)).length
     })), [categories, productSource]);
 
-  const mainCategoryTiles = categoryTiles.slice(0, 5);
-  const secondaryCategoryTiles = categoryTiles.slice(5);
+  const featuredProducts = productSource.slice(0, 8);
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.45 }}
+      transition={{ duration: 0.4 }}
       id="shop-view-container"
-      className="bg-[#fafafa] pb-20 text-[#111111]"
+      className="bg-[#F8F6F1] text-[#111111]"
     >
-      <HeroSection
-        content={content}
-        onShopEdit={scrollToProducts}
-        onViewLookbook={() => setActiveScreen('discover')}
-      />
+      {/* 1. Hero */}
+      <HeroSection content={content} onShopEdit={scrollToProducts} onViewLookbook={() => setActiveScreen('discover')} />
 
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-20" id="our-products-section">
-        <div className="mx-auto mb-10 max-w-2xl text-center">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#6f6f6f]">{content.productsEyebrow}</p>
-          <h2 className="mt-2 font-display text-4xl font-black uppercase leading-none sm:text-5xl">
-            {content.productsTitle}
-          </h2>
-          <p className="mx-auto mt-4 max-w-[400px] text-[0.875rem] leading-6 text-[#555555]">
-            {content.productsBody}
-          </p>
-          <div className="mx-auto mt-7 h-px w-10 bg-[#111111]" aria-hidden="true" />
-        </div>
+      {/* 2. Brand trust strip */}
+      <BrandLogoMarquee />
 
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-[3px] bg-white sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr] lg:grid-rows-[260px_260px]">
-          {mainCategoryTiles.map((category, index) => (
-            <CategoryCard
+      {/* 3. Shop by Category */}
+      <section className="mx-auto max-w-[1280px] px-5 py-14 sm:px-6 sm:py-16 lg:px-8 lg:py-20" id="our-products-section">
+        <SectionHeader
+          eyebrow={content.productsEyebrow || 'Shop by Category'}
+          title={content.productsTitle || 'Our Products'}
+          description={content.productsBody || 'Explore curated essentials across clothing, footwear, and everyday luxury.'}
+        />
+
+        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {categoryTiles.map((category) => (
+            <button
               key={category.id}
-              category={category}
-              fallbackImage={fallbackCategoryImages[index % fallbackCategoryImages.length]}
-              featured={index === 0}
-              onOpenCategory={onOpenCategory}
-              className={index === 0 ? 'lg:col-start-1 lg:row-span-2 lg:row-start-1' : ''}
-            />
+              type="button"
+              onClick={() => onOpenCategory(category.slug)}
+              className="group relative overflow-hidden rounded-lg bg-white border border-[#DDD8CF] text-left transition duration-300 hover:border-[#111111] hover:shadow-lg"
+            >
+              <div className="aspect-[4/3] overflow-hidden bg-[#EFECE6]">
+                {category.image ? (
+                  <img
+                    src={category.image}
+                    alt={category.name}
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-[#6B625A]">
+                    <span className="font-display text-2xl font-bold">{category.name.charAt(0)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-[#111111]">{category.name}</h3>
+                    <p className="mt-1 text-[12px] text-[#6B625A]">
+                      {category.count > 0 ? `${category.count} pieces` : 'Coming soon'}
+                    </p>
+                  </div>
+                  <ArrowRight size={16} className="mt-1 shrink-0 text-[#6B625A] transition group-hover:translate-x-1 group-hover:text-[#111111]" />
+                </div>
+                {category.description && (
+                  <p className="mt-3 line-clamp-2 text-[13px] leading-relaxed text-[#6B625A]">
+                    {category.description}
+                  </p>
+                )}
+              </div>
+            </button>
           ))}
-        </div>
-
-        {secondaryCategoryTiles.length > 0 && (
-          <div className="mx-auto mt-[3px] grid max-w-6xl grid-cols-1 gap-[3px] bg-white sm:grid-cols-2 lg:grid-cols-3">
-            {secondaryCategoryTiles.map((category) => (
-              <CategoryCard
-                key={category.id}
-                category={category}
-                fallbackImage={fallbackCategoryImages[categoryTiles.indexOf(category) % fallbackCategoryImages.length]}
-                onOpenCategory={onOpenCategory}
-                className="min-h-[220px] sm:min-h-[220px] lg:min-h-[200px]"
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="mx-auto mt-10 flex max-w-6xl flex-col items-center justify-center gap-3 border-t border-black/10 pt-6 text-center font-mono text-[0.625rem] uppercase tracking-[0.18em] text-[#6f6f6f] sm:flex-row sm:gap-8">
-          <span>Verified authentic pieces</span>
-          <span>100% original</span>
-          <span>Best price & quality</span>
         </div>
       </section>
 
+      {/* 4. Featured Products */}
+      {featuredProducts.length > 0 && (
+        <section className="bg-white py-14 sm:py-16 lg:py-20">
+          <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-8">
+            <SectionHeader eyebrow="New Arrivals" title="Featured Pieces" description="Hand-picked from our latest collection." />
+
+            <div className="mt-10 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+              {featuredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} onSelect={onSelectProduct} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 5. Trust Section */}
+      <section className="bg-[#F8F6F1] py-12 sm:py-14 lg:py-16">
+        <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
+            <TrustCard icon={CheckCircle2} title="Verified Authentic" description="Every piece is brand-verified before listing." />
+            <TrustCard icon={Truck} title="India-wide Delivery" description="Fast shipping across all major cities and towns." />
+            <TrustCard icon={RotateCcw} title="Easy Returns" description="Hassle-free returns within the eligible window." />
+            <TrustCard icon={Headphones} title="Size Support" description="Get help finding the perfect fit before you buy." />
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Customer Reviews */}
       <CustomerNotesSection />
 
-      <section className="border-y border-[#d8d8d3] bg-white" aria-label="Our story">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-7 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_auto] lg:px-8 lg:py-14">
-          <div className="max-w-3xl">
-            <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#6f6f6f]">Our Story</p>
-            <h2 className="mt-4 font-display text-3xl font-black uppercase leading-tight text-[#050505] sm:text-4xl lg:text-5xl">
-              Designed in studio. Made to outlast trend.
-            </h2>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-[#555555]">
-              Constructed by hand with quiet detail and everyday endurance.
-            </p>
+      {/* 7. Editorial CTA */}
+      <section className="bg-[#111111] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[1fr_auto]">
+            <div>
+              <p className="text-[12px] uppercase tracking-[0.2em] text-white/50">Our Story</p>
+              <h2 className="mt-4 font-display text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+                Designed in studio.<br />Made to outlast trend.
+              </h2>
+              <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-white/65">
+                Constructed by hand with quiet detail and everyday endurance. Real branded fashion for modern Indian wardrobes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveScreen('about')}
+              className="group inline-flex items-center gap-3 border border-white px-7 py-4 text-[13px] font-semibold tracking-wide text-white transition hover:bg-white hover:text-[#111111]"
+            >
+              Read Our Story
+              <ArrowRight size={16} strokeWidth={1.8} className="transition-transform group-hover:translate-x-1" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setActiveScreen('about')}
-            className="group inline-flex w-fit items-center gap-3 border border-[#111111] px-5 py-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[#111111] transition hover:bg-[#111111] hover:text-white"
-          >
-            Read the Story
-            <ArrowRight size={15} strokeWidth={1.6} className="transition-transform duration-300 group-hover:translate-x-1" />
-          </button>
         </div>
       </section>
     </motion.div>
   );
 };
+
+/* --- Subcomponents --- */
+
+function SectionHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+  return (
+    <div className="mx-auto max-w-2xl text-center">
+      <p className="text-[11px] uppercase tracking-[0.2em] text-[#6B625A]">{eyebrow}</p>
+      <h2 className="mt-3 font-display text-3xl font-black text-[#111111] sm:text-4xl">{title}</h2>
+      <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-[#6B625A]">{description}</p>
+    </div>
+  );
+}
+
+function ProductCard({ product, onSelect }: { product: Product; onSelect: (p: Product) => void }) {
+  const hasDiscount = product.originalPrice && product.originalPrice > product.price;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(product)}
+      className="group rounded-lg border border-[#DDD8CF] bg-white text-left transition duration-300 hover:border-[#111111] hover:shadow-md"
+    >
+      <div className="relative aspect-[3/4] overflow-hidden rounded-t-lg bg-[#EFECE6]">
+        <img
+          src={product.image}
+          alt={product.name}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+        />
+        {hasDiscount && (
+          <span className="absolute left-3 top-3 rounded bg-[#111111] px-2 py-1 text-[10px] font-semibold text-white">
+            SALE
+          </span>
+        )}
+      </div>
+      <div className="p-4">
+        <p className="text-[11px] uppercase tracking-wide text-[#6B625A]">{product.category}</p>
+        <h3 className="mt-1 text-[14px] font-semibold text-[#111111] line-clamp-1">{product.name}</h3>
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-[15px] font-bold text-[#111111]">{formatINR(product.price)}</span>
+          {hasDiscount && (
+            <span className="text-[12px] text-[#6B625A] line-through">{formatINR(product.originalPrice!)}</span>
+          )}
+        </div>
+        {product.sizes && product.sizes.length > 0 && (
+          <p className="mt-2 text-[11px] text-[#6B625A]">{product.sizes.join(' · ')}</p>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function TrustCard({ icon: Icon, title, description }: { icon: React.ElementType; title: string; description: string }) {
+  return (
+    <div className="rounded-lg border border-[#DDD8CF] bg-white p-5 text-center">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#EFECE6]">
+        <Icon size={18} strokeWidth={1.5} className="text-[#111111]" />
+      </div>
+      <h3 className="mt-3 text-[13px] font-semibold text-[#111111]">{title}</h3>
+      <p className="mt-1.5 text-[12px] leading-relaxed text-[#6B625A]">{description}</p>
+    </div>
+  );
+}

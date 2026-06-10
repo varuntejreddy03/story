@@ -1,5 +1,5 @@
 import React from 'react';
-import { Instagram, Mail, MessageCircle, type LucideIcon } from 'lucide-react';
+import { Instagram, Mail, MessageCircle } from 'lucide-react';
 import { ActiveScreen } from '../types';
 import { PolicyKey } from './PolicyView';
 
@@ -13,272 +13,202 @@ type FooterLink = {
   screen?: ActiveScreen;
   sectionId?: string;
   policyKey?: PolicyKey;
-  icon?: LucideIcon;
 };
 
-type FooterColumn = {
-  title: string;
-  links: FooterLink[];
-};
-
-const FOOTER_COLUMNS: FooterColumn[] = [
-  {
-    title: 'Shop',
-    links: [
-      { label: 'New Arrivals', screen: 'shop', sectionId: 'our-products-section' },
-      { label: 'Uppers', screen: 'shop', sectionId: 'our-products-section' },
-      { label: 'Lowers', screen: 'shop', sectionId: 'our-products-section' },
-      { label: 'Dresses', screen: 'shop', sectionId: 'our-products-section' },
-      { label: 'Co-ords', screen: 'shop', sectionId: 'our-products-section' },
-      { label: 'Footwear', screen: 'shop', sectionId: 'our-products-section' },
-      { label: 'Accessories', screen: 'shop', sectionId: 'our-products-section' },
-      { label: 'Inners', screen: 'shop', sectionId: 'our-products-section' }
-    ]
-  },
-  {
-    title: 'Story',
-    links: [
-      { label: 'Our Story', screen: 'about' },
-      { label: 'Curated Drops', screen: 'discover' },
-      { label: 'Style Edit', screen: 'discover' },
-      { label: 'Lookbook', screen: 'discover' },
-      { label: 'Customer Reviews', screen: 'shop' },
-      { label: 'Blog', screen: 'contact' }
-    ]
-  },
-  {
-    title: 'Support',
-    links: [
-      { label: 'Contact Us', screen: 'contact' },
-      { label: 'Shipping & Delivery', screen: 'contact' },
-      { label: 'Returns & Exchange', policyKey: 'returns' },
-      { label: 'Size Guide', screen: 'contact' },
-      { label: 'FAQ', screen: 'contact' },
-      { label: 'Track Order', screen: 'settings' }
-    ]
-  }
+const SHOP_LINKS: FooterLink[] = [
+  { label: 'New Arrivals', screen: 'shop', sectionId: 'our-products-section' },
+  { label: 'Uppers', screen: 'shop', sectionId: 'our-products-section' },
+  { label: 'Lowers', screen: 'shop', sectionId: 'our-products-section' },
+  { label: 'Dresses', screen: 'shop', sectionId: 'our-products-section' },
+  { label: 'Co-ords', screen: 'shop', sectionId: 'our-products-section' },
+  { label: 'Footwear', screen: 'shop', sectionId: 'our-products-section' },
+  { label: 'Accessories', screen: 'shop', sectionId: 'our-products-section' }
 ];
 
-const CONNECT_LINKS: FooterLink[] = [
-  { label: 'Instagram', icon: Instagram },
-  { label: 'WhatsApp', screen: 'contact', icon: MessageCircle },
-  { label: 'Email', screen: 'contact', icon: Mail }
+const STORY_LINKS: FooterLink[] = [
+  { label: 'Our Story', screen: 'about' },
+  { label: 'Collections', screen: 'discover' },
+  { label: 'Style Edit', screen: 'discover' },
+  { label: 'Customer Reviews', screen: 'shop' }
+];
+
+const SUPPORT_LINKS: FooterLink[] = [
+  { label: 'Contact Us', screen: 'contact' },
+  { label: 'Shipping & Delivery', screen: 'contact' },
+  { label: 'Returns & Exchange', policyKey: 'returns' },
+  { label: 'Size Guide', screen: 'contact' },
+  { label: 'FAQ', screen: 'contact' },
+  { label: 'Track Order', screen: 'settings' }
 ];
 
 const LEGAL_LINKS: FooterLink[] = [
   { label: 'Privacy Policy', policyKey: 'privacy' },
   { label: 'Terms & Conditions', policyKey: 'terms' },
-  { label: 'Return & Refund Policy', policyKey: 'returns' }
+  { label: 'Return Policy', policyKey: 'returns' }
 ];
 
-const policyHref = (policyKey: PolicyKey) => {
-  if (policyKey === 'terms') return '/terms-conditions';
-  if (policyKey === 'returns') return '/return-refund-policy';
-  return '/privacy-policy';
-};
-
 export const Footer: React.FC<FooterProps> = ({ setActiveScreen, onOpenPolicy }) => {
-  const handleFooterLink = (link: FooterLink) => {
-    if (link.policyKey) {
-      onOpenPolicy(link.policyKey);
-      return;
-    }
-
-    if (link.screen) {
-      setActiveScreen(link.screen);
-    }
-
+  const handleLink = (link: FooterLink) => {
+    if (link.policyKey) { onOpenPolicy(link.policyKey); return; }
+    if (link.screen) setActiveScreen(link.screen);
     if (link.sectionId) {
       window.setTimeout(() => {
-        document.getElementById(link.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById(link.sectionId!)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 30);
     }
   };
 
-  const renderLink = (link: FooterLink) => {
-    const linkClassName = "inline-block text-left text-[#696965] transition duration-200 hover:translate-x-1 hover:text-[#111111] hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#111111] focus-visible:ring-offset-4";
-
-    if (link.policyKey) {
-      return (
-        <a
-          href={policyHref(link.policyKey)}
-          onClick={(event) => {
-            event.preventDefault();
-            handleFooterLink(link);
-          }}
-          className={linkClassName}
-        >
-          {link.label}
-        </a>
-      );
-    }
-
-    if (!link.screen && !link.sectionId) {
-      return (
-        <a
-          href="#"
-          className={linkClassName}
-        >
-          {link.label}
-        </a>
-      );
-    }
-
-    return (
+  const LinkItem = ({ link }: { link: FooterLink }) => (
+    <li>
       <button
         type="button"
-        onClick={() => handleFooterLink(link)}
-        className={linkClassName}
+        onClick={() => handleLink(link)}
+        className="text-[14px] leading-relaxed text-[#6B625A] transition duration-200 hover:text-[#111111]"
       >
         {link.label}
       </button>
-    );
-  };
-
-  const renderColumn = (column: FooterColumn) => (
-    <nav key={column.title} aria-label={`${column.title} footer links`}>
-      <h3 className="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-[#111111]">
-        {column.title}
-      </h3>
-      <ul className="mt-5 space-y-3 font-mono text-[0.68rem] uppercase tracking-[0.08em]">
-        {column.links.map((link) => (
-          <li key={link.label}>{renderLink(link)}</li>
-        ))}
-      </ul>
-    </nav>
+    </li>
   );
 
-  const renderConnectIcon = (link: FooterLink) => {
-    const Icon = link.icon;
-    if (!Icon) return null;
-
-    const iconClassName = "inline-flex h-10 w-10 items-center justify-center border border-[#111111]/20 bg-white text-[#111111] transition duration-200 hover:-translate-y-0.5 hover:border-[#111111] hover:bg-[#111111] hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-[#111111] focus-visible:ring-offset-4";
-    const iconContent = (
-      <>
-        <Icon size={18} strokeWidth={1.7} />
-        <span className="sr-only">{link.label}</span>
-      </>
-    );
-
-    if (!link.screen && !link.sectionId) {
-      return (
-        <a key={link.label} href="#" className={iconClassName} aria-label={link.label} title={link.label}>
-          {iconContent}
-        </a>
-      );
-    }
-
-    return (
-      <button
-        key={link.label}
-        type="button"
-        onClick={() => handleFooterLink(link)}
-        className={iconClassName}
-        aria-label={link.label}
-        title={link.label}
-      >
-        {iconContent}
-      </button>
-    );
-  };
+  const ColumnTitle = ({ children }: { children: string }) => (
+    <h3 className="mb-5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#111111]">
+      {children}
+    </h3>
+  );
 
   return (
-    <footer className="border-t border-black/10 bg-[#f6f6f3] text-[#111111]" id="global-footer">
-      <div className="mx-auto max-w-7xl px-5 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <div className="grid gap-10 border-b border-black/10 pb-10 lg:grid-cols-[1.1fr_1.9fr] lg:gap-14 lg:pb-14">
-          <div className="max-w-md">
+    <footer className="border-t border-[#DDD8CF] bg-[#F8F6F1]" id="global-footer">
+      <div className="mx-auto max-w-[1280px] px-5 py-16 sm:px-6 lg:px-8 lg:py-20">
+
+        {/* Desktop: 5-column grid */}
+        <div className="hidden gap-8 lg:grid lg:grid-cols-[1.4fr_1fr_1fr_1fr_1.2fr]">
+          {/* Brand */}
+          <div>
             <button
               type="button"
               onClick={() => setActiveScreen('shop')}
-              className="font-display text-4xl font-black uppercase leading-none tracking-[0.08em] text-[#050505] transition hover:opacity-70 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#111111] focus-visible:ring-offset-4 sm:text-5xl"
+              className="font-display text-3xl font-black tracking-tight text-[#111111] transition hover:opacity-70"
               aria-label="STORY home"
             >
               STORY
             </button>
-            <p className="mt-5 font-mono text-[0.68rem] uppercase tracking-[0.2em] text-[#696965]">
-              STORY INDIA EST. 2026
+            <p className="mt-2 text-[12px] font-medium uppercase tracking-[0.2em] text-[#6B625A]">
+              India · Est. 2026
             </p>
-            <p className="mt-6 text-sm leading-6 text-[#4f4f4b]">
+            <p className="mt-5 max-w-[240px] text-[14px] leading-relaxed text-[#6B625A]">
               Verified branded fashion, curated in India for everyday premium style.
             </p>
-            <div className="mt-8 flex items-start">
-              <div className="relative h-28 w-28 shrink-0 sm:h-32 sm:w-32">
-                <svg className="absolute inset-0 h-full w-full animate-[spin_20s_linear_infinite]" viewBox="0 0 200 200">
-                  <defs>
-                    <path id="footerCirclePath" d="M 100,100 m -76,0 a 76,76 0 1,1 152,0 a 76,76 0 1,1 -152,0" fill="none" />
-                  </defs>
-                  <text className="fill-[#4f4f4b]" style={{ fontSize: '11.2px', fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase' }}>
-                    <textPath href="#footerCirclePath" startOffset="0%">
-                      Verified authentic • 100% original • Best price &amp; quality •&nbsp;
-                    </textPath>
-                  </text>
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[#111111]/20 sm:h-14 sm:w-14">
-                    <span className="font-display text-[0.55rem] font-black uppercase tracking-[0.06em] text-[#111111] sm:text-[0.6rem]">STORY</span>
-                  </span>
-                </span>
-              </div>
+            <div className="mt-6 flex items-center gap-3">
+              <a href="#" className="flex h-10 w-10 items-center justify-center rounded-full border border-[#DDD8CF] text-[#6B625A] transition hover:border-[#111111] hover:bg-[#111111] hover:text-white" aria-label="Instagram">
+                <Instagram size={16} strokeWidth={1.6} />
+              </a>
+              <button type="button" onClick={() => setActiveScreen('contact')} className="flex h-10 w-10 items-center justify-center rounded-full border border-[#DDD8CF] text-[#6B625A] transition hover:border-[#111111] hover:bg-[#111111] hover:text-white" aria-label="WhatsApp">
+                <MessageCircle size={16} strokeWidth={1.6} />
+              </button>
+              <button type="button" onClick={() => setActiveScreen('contact')} className="flex h-10 w-10 items-center justify-center rounded-full border border-[#DDD8CF] text-[#6B625A] transition hover:border-[#111111] hover:bg-[#111111] hover:text-white" aria-label="Email">
+                <Mail size={16} strokeWidth={1.6} />
+              </button>
             </div>
           </div>
 
-          <div className="hidden grid-cols-4 gap-8 lg:grid">
-            {FOOTER_COLUMNS.map(renderColumn)}
+          {/* Shop */}
+          <nav aria-label="Shop links">
+            <ColumnTitle>Shop</ColumnTitle>
+            <ul className="space-y-3">{SHOP_LINKS.map((l) => <LinkItem key={l.label} link={l} />)}</ul>
+          </nav>
 
-            <nav aria-label="Connect footer links">
-              <h3 className="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-[#111111]">
-                Connect
-              </h3>
-              <p className="mt-5 max-w-[220px] text-sm leading-6 text-[#4f4f4b]">
-                Need help finding your fit? Our team can help with size, styling, delivery, and product questions.
-              </p>
-              <div className="mt-5 flex items-center gap-3">
-                {CONNECT_LINKS.map(renderConnectIcon)}
-              </div>
-              <p className="mt-5 font-mono text-[0.58rem] uppercase leading-5 tracking-[0.12em] text-[#8a8a84]">
-                WhatsApp: +91 98765 43210
-                <br />
-                Email: care@story.in
-              </p>
-            </nav>
-          </div>
+          {/* Story */}
+          <nav aria-label="Story links">
+            <ColumnTitle>Story</ColumnTitle>
+            <ul className="space-y-3">{STORY_LINKS.map((l) => <LinkItem key={l.label} link={l} />)}</ul>
+          </nav>
 
-          <div className="space-y-3 lg:hidden">
-            {FOOTER_COLUMNS.map((column) => (
-              <details key={column.title} className="group border-t border-black/10 py-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between font-mono text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-[#111111]">
-                  {column.title}
-                  <span className="text-base leading-none transition group-open:rotate-45">+</span>
-                </summary>
-                <ul className="mt-5 space-y-3 font-mono text-[0.68rem] uppercase tracking-[0.08em]">
-                  {column.links.map((link) => (
-                    <li key={link.label}>{renderLink(link)}</li>
-                  ))}
-                </ul>
-              </details>
-            ))}
+          {/* Support */}
+          <nav aria-label="Support links">
+            <ColumnTitle>Support</ColumnTitle>
+            <ul className="space-y-3">{SUPPORT_LINKS.map((l) => <LinkItem key={l.label} link={l} />)}</ul>
+          </nav>
 
-            <details className="group border-t border-black/10 py-4">
-              <summary className="flex cursor-pointer list-none items-center justify-between font-mono text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-[#111111]">
-                Connect
-                <span className="text-base leading-none transition group-open:rotate-45">+</span>
-              </summary>
-              <p className="mt-5 text-sm leading-6 text-[#4f4f4b]">
-                Need help finding your fit? Our team can help with size, styling, delivery, and product questions.
-              </p>
-              <div className="mt-5 flex items-center gap-3">
-                {CONNECT_LINKS.map(renderConnectIcon)}
-              </div>
-            </details>
+          {/* Connect */}
+          <div>
+            <ColumnTitle>Connect</ColumnTitle>
+            <p className="text-[14px] leading-relaxed text-[#6B625A]">
+              Need help with size, styling, delivery, or product questions? We're here.
+            </p>
+            <div className="mt-5 space-y-2 text-[13px] text-[#6B625A]">
+              <p><span className="font-medium text-[#111111]">WhatsApp:</span> +91 98765 43210</p>
+              <p><span className="font-medium text-[#111111]">Email:</span> care@story.in</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveScreen('contact')}
+              className="mt-5 inline-flex items-center gap-2 border border-[#111111] px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-[#111111] transition hover:bg-[#111111] hover:text-white"
+            >
+              Contact Us
+            </button>
           </div>
         </div>
 
-        <div className="grid gap-5 pt-7 font-mono text-[0.62rem] uppercase leading-5 tracking-[0.14em] text-[#696965] lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-          <p>&copy; STORY India 2026. All rights reserved.</p>
-          <p className="lg:text-center">Verified authentic pieces &bull; Curated in India</p>
-          <nav className="flex flex-wrap gap-x-5 gap-y-2 lg:justify-end" aria-label="Legal footer links">
+        {/* Mobile: accordion */}
+        <div className="space-y-0 lg:hidden">
+          <div className="mb-8">
+            <span className="font-display text-2xl font-black tracking-tight text-[#111111]">STORY</span>
+            <p className="mt-1 text-[12px] font-medium uppercase tracking-[0.15em] text-[#6B625A]">India · Est. 2026</p>
+            <p className="mt-4 max-w-sm text-[14px] leading-relaxed text-[#6B625A]">
+              Verified branded fashion, curated in India for everyday premium style.
+            </p>
+            <div className="mt-5 flex items-center gap-3">
+              <a href="#" className="flex h-10 w-10 items-center justify-center rounded-full border border-[#DDD8CF] text-[#6B625A]" aria-label="Instagram"><Instagram size={16} /></a>
+              <button type="button" onClick={() => setActiveScreen('contact')} className="flex h-10 w-10 items-center justify-center rounded-full border border-[#DDD8CF] text-[#6B625A]" aria-label="WhatsApp"><MessageCircle size={16} /></button>
+              <button type="button" onClick={() => setActiveScreen('contact')} className="flex h-10 w-10 items-center justify-center rounded-full border border-[#DDD8CF] text-[#6B625A]" aria-label="Email"><Mail size={16} /></button>
+            </div>
+          </div>
+
+          {[
+            { title: 'Shop', links: SHOP_LINKS },
+            { title: 'Story', links: STORY_LINKS },
+            { title: 'Support', links: SUPPORT_LINKS }
+          ].map((section) => (
+            <details key={section.title} className="group border-t border-[#DDD8CF]">
+              <summary className="flex cursor-pointer items-center justify-between py-5 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#111111]">
+                {section.title}
+                <span className="text-lg text-[#6B625A] transition group-open:rotate-45">+</span>
+              </summary>
+              <ul className="space-y-3 pb-5">
+                {section.links.map((l) => <LinkItem key={l.label} link={l} />)}
+              </ul>
+            </details>
+          ))}
+
+          <div className="border-t border-[#DDD8CF] pt-5">
+            <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#111111]">Connect</p>
+            <div className="mt-3 space-y-1 text-[13px] text-[#6B625A]">
+              <p>WhatsApp: +91 98765 43210</p>
+              <p>Email: care@story.in</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveScreen('contact')}
+              className="mt-4 border border-[#111111] px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-[#111111]"
+            >
+              Contact Us
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="mt-12 flex flex-col gap-4 border-t border-[#DDD8CF] pt-8 lg:flex-row lg:items-center lg:justify-between">
+          <p className="text-[12px] text-[#6B625A]">© 2026 STORY India. All rights reserved.</p>
+          <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Legal">
             {LEGAL_LINKS.map((link) => (
-              <React.Fragment key={link.label}>{renderLink(link)}</React.Fragment>
+              <button
+                key={link.label}
+                type="button"
+                onClick={() => handleLink(link)}
+                className="text-[12px] text-[#6B625A] transition hover:text-[#111111]"
+              >
+                {link.label}
+              </button>
             ))}
           </nav>
         </div>

@@ -177,11 +177,11 @@ const TrustItem: React.FC<{ icon: React.ElementType; label: string; value: strin
 );
 
 const ServiceCard: React.FC<{ icon: React.ElementType; title: string; body: string }> = ({ icon: Icon, title, body }) => (
-  <div className="flex min-w-[220px] shrink-0 items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:min-w-[240px] lg:min-w-0 lg:flex-1 lg:p-5">
-    <Icon size={20} strokeWidth={1.5} className="mt-0.5 shrink-0 text-[#111111]" />
+  <div className="flex min-w-[200px] shrink-0 items-start gap-3 rounded-lg border border-gray-100 bg-white px-4 py-3 shadow-sm sm:min-w-[220px] lg:min-w-0 lg:flex-1">
+    <Icon size={16} strokeWidth={1.5} className="mt-0.5 shrink-0 text-[#111111]" />
     <div>
-      <p className="text-sm font-semibold uppercase text-[#111111]">{title}</p>
-      <p className="mt-2 text-xs leading-5 text-gray-500 sm:text-sm sm:leading-6">{body}</p>
+      <p className="text-xs font-semibold text-[#111111]">{title}</p>
+      <p className="mt-1 text-[11px] leading-4 text-gray-500">{body}</p>
     </div>
   </div>
 );
@@ -245,7 +245,7 @@ export const CategoryGenderView: React.FC<CategoryGenderViewProps> = ({
       return 'grid grid-cols-2 gap-3 px-4 sm:px-0 sm:gap-6';
     }
 
-    return 'grid grid-cols-2 gap-3 px-4 sm:px-0 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4';
+    return 'grid grid-cols-2 gap-3 px-4 sm:px-0 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4';
   }, [visibleProducts.length]);
 
   return (
@@ -257,7 +257,7 @@ export const CategoryGenderView: React.FC<CategoryGenderViewProps> = ({
       className="bg-[#f6f5f1] pb-16 text-[#111111] sm:pb-20"
       id="category-gender-view"
     >
-      <section className="mx-auto max-w-screen-xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+      <section className="mx-auto max-w-screen-xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
@@ -273,7 +273,7 @@ export const CategoryGenderView: React.FC<CategoryGenderViewProps> = ({
         </div>
 
         <div className="grid gap-5 lg:grid-cols-2 lg:items-center">
-          <div className="border-y border-[#d8d3ca] bg-[#fbfaf7] px-1 py-6 sm:px-0 sm:py-8 lg:py-10">
+          <div className="border-y border-[#d8d3ca] bg-[#fbfaf7] px-1 py-5 sm:px-0 sm:py-6 lg:py-8">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.78fr)] lg:items-end">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#6f6b62]">Story category</p>
@@ -293,7 +293,7 @@ export const CategoryGenderView: React.FC<CategoryGenderViewProps> = ({
             </div>
           </div>
 
-          <div className="relative order-first h-[min(70vw,280px)] overflow-hidden rounded-xl border border-[#d8d3ca] bg-[#e9e4da] shadow-sm sm:h-80 lg:order-none lg:h-auto lg:min-h-[330px]">
+          <div className="relative order-first h-[min(55vw,220px)] overflow-hidden rounded-xl border border-[#d8d3ca] bg-[#e9e4da] shadow-sm sm:h-64 lg:order-none lg:h-auto lg:max-h-[380px] lg:min-h-[280px]">
             <img
               src={heroImage}
               alt={`${title} category`}
