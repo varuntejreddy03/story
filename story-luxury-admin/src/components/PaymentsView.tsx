@@ -30,20 +30,12 @@ export default function PaymentsView({ transactions }: PaymentsViewProps) {
 
   return (
     <div className="flex flex-col gap-8 text-left">
-      {/* Header and Download CTA */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold font-sans text-neutral-900 tracking-tight">Payments</h2>
           <p className="text-sm font-sans text-neutral-500 mt-1">Audit payment statuses, instant settlements, and transactional ledger items.</p>
         </div>
-        
-        <button 
-          onClick={handleDownloadStatement}
-          className="flex items-center justify-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg text-xs font-semibold hover:bg-neutral-850 transition-colors uppercase tracking-wider relative overflow-hidden"
-        >
-          <FileDown size={16} />
-          <span>Download Statement</span>
-        </button>
       </div>
 
       {/* Success banner toast if statements downloaded */}

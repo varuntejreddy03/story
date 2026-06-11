@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { motion } from 'motion/react';
 import { TrendingUp, Settings2, Plus, Percent, FolderPlus } from 'lucide-react';
 import { Product, Order } from '../types';
@@ -52,24 +53,39 @@ export default function DashboardView({
   onOpenCreateCoupon,
   stats
 }: DashboardViewProps) {
-  const paidOrders = orders.filter(o => o.paymentStatus === 'Paid');
+  const [timeRange, setTimeRange] = React.useState<'today' | '7days' | '30days'>('30days');
+
+  const filteredOrders = React.useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start7Days = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const start30Days = new Date(startOfToday.getTime() - 29 * 24 * 60 * 60 * 1000);
+    const rangeStart = timeRange === 'today' ? startOfToday : timeRange === '7days' ? start7Days : start30Days;
+
+    return orders.filter(o => {
+      const d = parseOrderDate(o.date);
+      return d && d >= rangeStart;
+    });
+  }, [orders, timeRange]);
+
+  const paidOrders = filteredOrders.filter(o => o.paymentStatus === 'Paid');
   const fallbackRevenue = paidOrders.reduce((acc, curr) => acc + curr.amount, 0);
 
-  const totalOrdersCount = stats?.orders.total ?? orders.length;
+  const totalOrdersCount = stats?.orders.total ?? filteredOrders.length;
   const lowStockCount = stats?.lowStockProducts ?? products.filter(p => p.stock < 5).length;
   const lowStockProducts = products.filter(p => p.stock > 0 && p.stock < 5);
-  const bestSellers = products.slice(0, 2); // default best sellers for this demo
-  const recentOrders = stats?.recentOrders?.length ? stats.recentOrders : orders.slice(0, 5);
+  const bestSellers = products.slice(0, 2);
+  const recentOrders = stats?.recentOrders?.length ? stats.recentOrders : filteredOrders.slice(0, 5);
 
   const statCards = [
-    { label: 'Revenue Today', value: formatINR(stats?.revenue.today ?? 0), action: 'Payments' },
-    { label: 'Revenue Month', value: formatINR(stats?.revenue.month ?? fallbackRevenue), action: 'Payments' },
-    { label: 'Revenue All Time', value: formatINR(stats?.revenue.allTime ?? fallbackRevenue), action: 'Payments' },
-    { label: 'Orders Total', value: totalOrdersCount.toLocaleString(), action: 'Orders' },
-    { label: 'Orders Today', value: String(stats?.orders.today ?? 0), action: 'Orders' },
-    { label: 'Orders Month', value: String(stats?.orders.month ?? orders.length), action: 'Orders' },
+    { label: 'Revenue', value: formatINR(fallbackRevenue), action: 'Payments' },
+    { label: 'Orders', value: filteredOrders.length.toLocaleString(), action: 'Orders' },
+    { label: 'Paid Orders', value: String(paidOrders.length), action: 'Orders' },
+    { label: 'Avg Order Value', value: formatINR(paidOrders.length ? Math.round(fallbackRevenue / paidOrders.length) : 0), action: 'Payments' },
     { label: 'Products', value: String(stats?.products ?? products.length), action: 'Products' },
-    { label: 'Low Stock', value: String(lowStockCount), action: 'Inventory' }
+    { label: 'Low Stock', value: String(lowStockCount), action: 'Inventory' },
+    { label: 'Customers', value: String(stats?.customers ?? 0), action: 'Customers' },
+    { label: 'Revenue All Time', value: formatINR(stats?.revenue.allTime ?? orders.filter(o => o.paymentStatus === 'Paid').reduce((a, o) => a + o.amount, 0)), action: 'Payments' }
   ];
 
   const revenueMonths = Array.from({ length: 8 }, (_, index) => {
@@ -147,9 +163,9 @@ export default function DashboardView({
           <p className="font-sans text-sm text-neutral-500 mt-1">Manage orders, products, inventory, and payments from one place.</p>
         </div>
         <div className="flex bg-neutral-100 rounded-lg p-1 border border-neutral-200/50 w-full md:w-auto">
-          <button className="flex-1 md:flex-none px-4 py-1.5 text-xs font-medium text-neutral-900 bg-white rounded shadow-xs">Today</button>
-          <button className="flex-1 md:flex-none px-4 py-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors">7 Days</button>
-          <button className="flex-1 md:flex-none px-4 py-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors">30 Days</button>
+          <button onClick={() => setTimeRange('today')} className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-medium rounded transition-colors ${timeRange === 'today' ? 'text-neutral-900 bg-white shadow-xs' : 'text-neutral-500 hover:text-neutral-900'}`}>Today</button>
+          <button onClick={() => setTimeRange('7days')} className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-medium rounded transition-colors ${timeRange === '7days' ? 'text-neutral-900 bg-white shadow-xs' : 'text-neutral-500 hover:text-neutral-900'}`}>7 Days</button>
+          <button onClick={() => setTimeRange('30days')} className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-medium rounded transition-colors ${timeRange === '30days' ? 'text-neutral-900 bg-white shadow-xs' : 'text-neutral-500 hover:text-neutral-900'}`}>30 Days</button>
         </div>
       </div>
 

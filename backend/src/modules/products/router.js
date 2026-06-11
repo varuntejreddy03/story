@@ -84,6 +84,18 @@ const normalizeProductInput = async (body, imageFiles = [], secondaryImageFile) 
     : undefined;
   const hasBodyImages = body.images !== undefined && body.images !== null && body.images !== '';
   const bodyImages = hasBodyImages ? parseMaybeJson(body.images, []) : undefined;
+
+  // Reject base64 data URLs — require proper HTTP URLs
+  if (bodyImages?.length) {
+    const base64Image = bodyImages.find((img) => typeof img === 'string' && img.startsWith('data:'));
+    if (base64Image) {
+      throw new ApiError(400, 'Base64 image data is not allowed. Please provide a valid image URL (http:// or https://) or upload a file.');
+    }
+  }
+  if (body.secondaryImage && body.secondaryImage.startsWith('data:')) {
+    throw new ApiError(400, 'Base64 image data is not allowed for secondary image. Please provide a valid URL or upload a file.');
+  }
+
   const images = hasBodyImages || uploadedImages.length
     ? [...(bodyImages || []), ...uploadedImages]
     : undefined;

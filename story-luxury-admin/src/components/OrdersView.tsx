@@ -88,14 +88,9 @@ export default function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewPr
             </select>
           </div>
 
-          <button className="flex items-center gap-2 bg-white border border-neutral-200 text-neutral-700 text-sm rounded-lg px-4 py-2.5 hover:bg-neutral-50 transition-colors flex-1 md:flex-none justify-center">
-            <Calendar size={15} />
-            <span>Last 30 Days</span>
-          </button>
-          
-          <button className="flex items-center gap-2 bg-white border border-neutral-200 text-neutral-700 text-sm rounded-lg px-4 py-2.5 hover:bg-neutral-50 transition-colors flex-1 md:flex-none justify-center">
+          <button className="flex items-center gap-2 bg-white border border-neutral-200 text-neutral-700 text-sm rounded-lg px-4 py-2.5 hover:bg-neutral-50 transition-colors flex-1 md:flex-none justify-center" onClick={() => setStatusFilter('All')}>
             <Filter size={15} />
-            <span>More Filters</span>
+            <span>Clear Filters</span>
           </button>
         </div>
       </div>
