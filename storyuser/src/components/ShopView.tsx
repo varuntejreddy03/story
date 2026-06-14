@@ -108,38 +108,29 @@ export const ShopView: React.FC<ShopViewProps> = ({ onSelectProduct, setActiveSc
       </section>
 
 
-      {/* 5. Trust Strip */}
-      <section className="bg-[#F5F5F3] py-6">
+      {/* 5. STORY Verified Seal */}
+      <section className="bg-[#F5F5F3] py-12 sm:py-14">
         <div className="mx-auto max-w-[1280px] px-5 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="rounded-lg border border-[#DDD8CF] bg-white p-4 text-center">
-              <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#EFECE6]">
-                <CheckCircle2 size={16} strokeWidth={1.5} className="text-[#111111]" />
+          <div className="flex flex-col items-center text-center">
+            <div className="relative flex h-40 w-40 items-center justify-center sm:h-52 sm:w-52">
+              <div className="absolute inset-0 rounded-full border-[3px] border-[#111111]" />
+              <div className="absolute inset-2.5 rounded-full border border-[#111111]/50" />
+              <svg className="absolute inset-0 h-full w-full animate-[spin_20s_linear_infinite]" viewBox="0 0 200 200">
+                <defs>
+                  <path id="homeSealCircle" d="M100,100 m-68,0 a68,68 0 1,1 136,0 a68,68 0 1,1 -136,0" fill="none" />
+                </defs>
+                <text className="fill-[#111111]" style={{ fontSize: '10px', fontFamily: 'Inter, sans-serif', fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                  <textPath href="#homeSealCircle" startOffset="0%">Verified authentic • 100% original • Best price &amp; quality • </textPath>
+                </text>
+              </svg>
+              <div className="flex flex-col items-center">
+                <span className="font-display text-2xl font-black tracking-[0.08em] text-[#111111] sm:text-3xl">STORY</span>
+                <span className="mt-0.5 text-[7px] font-medium uppercase tracking-[0.18em] text-[#6B625A] sm:text-[9px]">Verified Garment</span>
               </div>
-              <p className="mt-2 text-[12px] font-semibold text-[#111111]">Verified</p>
-              <p className="mt-1 text-[11px] text-[#6B625A]">Brand authenticated</p>
             </div>
-            <div className="rounded-lg border border-[#DDD8CF] bg-white p-4 text-center">
-              <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#EFECE6]">
-                <Truck size={16} strokeWidth={1.5} className="text-[#111111]" />
-              </div>
-              <p className="mt-2 text-[12px] font-semibold text-[#111111]">Fast Delivery</p>
-              <p className="mt-1 text-[11px] text-[#6B625A]">All India shipping</p>
-            </div>
-            <div className="rounded-lg border border-[#DDD8CF] bg-white p-4 text-center">
-              <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#EFECE6]">
-                <RotateCcw size={16} strokeWidth={1.5} className="text-[#111111]" />
-              </div>
-              <p className="mt-2 text-[12px] font-semibold text-[#111111]">Easy Returns</p>
-              <p className="mt-1 text-[11px] text-[#6B625A]">Hassle-free policy</p>
-            </div>
-            <div className="rounded-lg border border-[#DDD8CF] bg-white p-4 text-center">
-              <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#EFECE6]">
-                <Star size={16} strokeWidth={1.5} className="text-[#111111]" />
-              </div>
-              <p className="mt-2 text-[12px] font-semibold text-[#111111]">Best Price</p>
-              <p className="mt-1 text-[11px] text-[#6B625A]">Premium at fair value</p>
-            </div>
+            <p className="mt-5 max-w-sm text-[14px] leading-relaxed text-[#6B625A]">
+              Our seal ensures you have the best price, authentic brands, and premium quality with every purchase.
+            </p>
           </div>
         </div>
       </section>
