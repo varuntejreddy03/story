@@ -20,7 +20,9 @@ const bodySchema = z.object({
   isActive: z.coerce.boolean().optional().default(true),
   sortOrder: z.coerce.number().int().optional().default(0),
   isDynamic: z.coerce.boolean().optional().default(false),
-  parent: z.string().optional().nullable()
+  parent: z.string().optional().nullable(),
+  sizes: z.any().optional().nullable(),
+  genderFilter: z.string().optional().nullable()
 });
 
 categoriesRouter.get('/', asyncHandler(async (_req, res) => {

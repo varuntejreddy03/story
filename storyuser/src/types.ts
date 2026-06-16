@@ -36,6 +36,8 @@ export interface Category {
   sortOrder: number;
   isDynamic?: boolean;
   parent?: string;
+  sizes?: string[];
+  genderFilter?: string;
 }
 
 export interface CartItem {

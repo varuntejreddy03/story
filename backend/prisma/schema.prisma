@@ -71,6 +71,8 @@ model Category {
   sortOrder   Int       @default(0)
   isDynamic   Boolean   @default(false)
   parent      String?
+  sizes       Json?     // Available sizes for filter chips, e.g. ["XS","S","M","L","XL","XXL"]
+  genderFilter String?  @default("all") // "all", "men", "women", "none"
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   products    Product[]

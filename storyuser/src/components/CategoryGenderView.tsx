@@ -266,7 +266,7 @@ export const CategoryGenderView: React.FC<CategoryGenderViewProps> = ({
   );
   const [activeSize, setActiveSize] = React.useState('');
   const [activeGender, setActiveGender] = React.useState<'all' | 'men' | 'women'>(
-    categorySlug === 'dresses' ? 'women' : 'all'
+    (category?.genderFilter as 'all' | 'men' | 'women') || (categorySlug === 'dresses' ? 'women' : 'all')
   );
   const [sortMode, setSortMode] = React.useState<'featured' | 'low' | 'high'>('featured');
   const heroImage = category?.image || fallbackHeroImage;
@@ -282,13 +282,15 @@ export const CategoryGenderView: React.FC<CategoryGenderViewProps> = ({
 
   React.useEffect(() => {
     setActiveSize('');
-    setActiveGender(categorySlug === 'dresses' ? 'women' : 'all');
+    setActiveGender((category?.genderFilter as 'all' | 'men' | 'women') || (categorySlug === 'dresses' ? 'women' : 'all'));
     setSortMode('featured');
-  }, [categorySlug]);
+  }, [categorySlug, category?.genderFilter]);
 
   const sizeOptions = React.useMemo(
-    () => Array.from(new Set(categoryProducts.flatMap((product) => product.sizes || []))),
-    [categoryProducts]
+    () => category?.sizes?.length
+      ? category.sizes
+      : Array.from(new Set(categoryProducts.flatMap((product) => product.sizes || []))),
+    [category?.sizes, categoryProducts]
   );
 
   const visibleProducts = React.useMemo(() => {
@@ -388,8 +390,9 @@ export const CategoryGenderView: React.FC<CategoryGenderViewProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Gender filter */}
-              <div className="flex rounded-full border border-[#d8d3ca] overflow-hidden">
+              {/* Gender filter - hide if category says 'none' */}
+              {category?.genderFilter !== 'none' && (
+                <div className="flex rounded-full border border-[#d8d3ca] overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setActiveGender('all')}
@@ -412,6 +415,7 @@ export const CategoryGenderView: React.FC<CategoryGenderViewProps> = ({
                   Women
                 </button>
               </div>
+              )}
               {sizeOptions.length > 0 && (
                 <div className="scrollbar-hide flex flex-nowrap gap-1.5 overflow-x-auto">
                   <FilterChip label="All" selected={!activeSize} onClick={() => setActiveSize('')} />

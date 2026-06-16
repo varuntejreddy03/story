@@ -80,6 +80,8 @@ export interface Category {
   description: string;
   isDynamic: boolean;
   sortOrder?: number;
+  sizes?: string[] | string | null;
+  genderFilter?: string;
 }
 
 export interface Customer {

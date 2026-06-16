@@ -26,6 +26,8 @@ type CategoryDraft = {
   isDynamic: boolean;
   status: Category['status'];
   sortOrder: string;
+  sizes: string;
+  genderFilter: string;
   imageFile?: File;
 };
 
@@ -36,7 +38,9 @@ const draftFromCategory = (category: Category): CategoryDraft => ({
   parent: category.parent || 'None',
   isDynamic: category.isDynamic,
   status: category.status,
-  sortOrder: String(category.sortOrder || 0)
+  sortOrder: String(category.sortOrder || 0),
+  sizes: Array.isArray(category.sizes) ? category.sizes.join(', ') : (category.sizes || ''),
+  genderFilter: category.genderFilter || 'all'
 });
 
 export default function CategoriesView({
@@ -104,7 +108,9 @@ export default function CategoriesView({
       parent: draft.parent || 'None',
       isDynamic: draft.isDynamic,
       status: draft.status,
-      sortOrder: Number(draft.sortOrder) || 0
+      sortOrder: Number(draft.sortOrder) || 0,
+      sizes: draft.sizes ? draft.sizes.split(',').map(s => s.trim()).filter(Boolean) : null,
+      genderFilter: draft.genderFilter || 'all'
     });
     cancelEditing();
   };
@@ -322,6 +328,22 @@ export default function CategoriesView({
                         </select>
                       </label>
 
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 text-xs font-sans md:grid-cols-2 mt-3">
+                      <label className="flex flex-col gap-1.5 md:col-span-2">
+                        <span className="font-semibold text-neutral-700">Sizes (comma separated)</span>
+                        <input value={draft.sizes} onChange={e => setDraft({ ...draft, sizes: e.target.value })} placeholder="XS, S, M, L, XL, XXL" className="rounded-lg border border-neutral-200 bg-white p-2.5 outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
+                      </label>
+                      <label className="flex flex-col gap-1.5">
+                        <span className="font-semibold text-neutral-700">Gender Filter</span>
+                        <select value={draft.genderFilter} onChange={e => setDraft({ ...draft, genderFilter: e.target.value })} className="rounded-lg border border-neutral-200 bg-white p-2.5 outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900">
+                          <option value="all">All (Men + Women)</option>
+                          <option value="men">Men only</option>
+                          <option value="women">Women only</option>
+                          <option value="none">Hide gender filter</option>
+                        </select>
+                      </label>
                     </div>
 
                     <div className="mt-4 flex justify-end gap-3">

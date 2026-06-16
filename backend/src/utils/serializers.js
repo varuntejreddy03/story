@@ -10,7 +10,9 @@ export const serializeCategory = (category) => ({
   productCount: category._count?.products ?? category.productCount ?? 0,
   sortOrder: category.sortOrder,
   isDynamic: category.isDynamic,
-  parent: category.parent || 'None'
+  parent: category.parent || 'None',
+  sizes: category.sizes || null,
+  genderFilter: category.genderFilter || 'all'
 });
 
 export const serializeProduct = (product) => {
