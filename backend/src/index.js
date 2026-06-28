@@ -30,7 +30,18 @@ const uploadsDir = path.join(backendRoot, 'uploads');
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || env.origins.includes(origin)) {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    // Check exact match or starts-with (handles ports like :2087)
+    const allowed = env.origins.some(o => {
+      const base = o.replace(/\/$/, '');
+      return origin === base || origin.startsWith(base);
+    });
+    // Also allow any origin sharing the same domain as FRONTEND_URL
+    const frontendDomain = (process.env.FRONTEND_URL || '').replace(/^https?:\/\//, '').replace(/\/$/, '').split(':')[0];
+    if (allowed || (frontendDomain && origin.includes(frontendDomain))) {
       callback(null, true);
       return;
     }
