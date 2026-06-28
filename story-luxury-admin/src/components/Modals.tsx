@@ -494,49 +494,50 @@ function ProductEditorModal({
                 </div>
 
                 <div className="flex flex-col gap-3 border-t border-neutral-100 pt-4">
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Images</span>
-                  <div className="grid grid-cols-4 gap-2">
-                    {productPresets.map((preset) => (
-                      <button
-                        key={preset.name}
-                        type="button"
-                        onClick={() => setDraft({ ...draft, images: [preset.url, ...draft.images.filter((image) => image !== preset.url)] })}
-                        className="h-14 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 hover:border-neutral-950"
-                        title={preset.name}
-                      >
-                        <img src={preset.url} alt={preset.name} className="h-full w-full object-cover grayscale" referrerPolicy="no-referrer" />
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Product Images (up to 5)</span>
+                    <span className="font-mono text-[10px] text-neutral-400">{draft.images.filter(Boolean).length}/5</span>
                   </div>
 
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-300 p-3 font-mono text-[10px] uppercase tracking-widest text-neutral-500 hover:border-neutral-950 hover:text-neutral-950">
-                    <Upload size={14} />
-                    Upload Images
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={event => handleImageFiles(event.target.files)} />
-                  </label>
+                  {/* Image previews grid */}
+                  {draft.images.filter(Boolean).length > 0 && (
+                    <div className="grid grid-cols-5 gap-2">
+                      {draft.images.filter(Boolean).map((image, index) => (
+                        <div key={`${image}-${index}`} className="group relative aspect-[3/4] overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100">
+                          <img alt="" className="h-full w-full object-cover" src={image} referrerPolicy="no-referrer" />
+                          <button type="button" onClick={() => removeImage(image)} className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex">
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
+                  {/* Upload button */}
+                  {draft.images.filter(Boolean).length < 5 && (
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-300 p-3 font-mono text-[10px] uppercase tracking-widest text-neutral-500 hover:border-neutral-950 hover:text-neutral-950">
+                      <Upload size={14} />
+                      Upload Images
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={event => handleImageFiles(event.target.files)} />
+                    </label>
+                  )}
+
+                  {/* URL inputs */}
                   <div className="flex flex-col gap-2">
                     {draft.images.map((image, index) => (
-                      <div key={`${image}-${index}`} className="flex items-center gap-2">
-                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded border border-neutral-200 bg-neutral-100">
-                          {image ? <img alt="" className="h-full w-full object-cover" src={image} referrerPolicy="no-referrer" /> : <ImageIcon size={14} className="m-3 text-neutral-300" />}
-                        </div>
+                      <div key={`url-${index}`} className="flex items-center gap-2">
                         <input value={image} onChange={event => updateImage(index, event.target.value)} className="min-w-0 flex-1 rounded-lg border border-neutral-200 p-2 font-mono text-[11px] outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" placeholder="https://..." />
                         <button type="button" onClick={() => removeImage(image)} className="rounded-lg border border-neutral-200 p-2 text-neutral-400 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
                           <Trash2 size={14} />
                         </button>
                       </div>
                     ))}
-                    <button type="button" onClick={() => setDraft({ ...draft, images: [...draft.images, ''] })} className="inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-200 py-2 font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:border-neutral-950 hover:text-neutral-950">
-                      <Plus size={13} /> Add URL
-                    </button>
+                    {draft.images.length < 5 && (
+                      <button type="button" onClick={() => setDraft({ ...draft, images: [...draft.images, ''] })} className="inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-200 py-2 font-mono text-[10px] uppercase tracking-widest text-neutral-600 hover:border-neutral-950 hover:text-neutral-950">
+                        <Plus size={13} /> Add Image URL
+                      </button>
+                    )}
                   </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-neutral-500">Secondary Image</span>
-                  <input value={draft.secondaryImage} onChange={event => setDraft({ ...draft, secondaryImage: event.target.value, secondaryImageFile: undefined })} className="rounded-lg border border-neutral-200 p-2.5 font-mono text-[11px] outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" placeholder="https://..." />
-                  <input type="file" accept="image/*" onChange={event => handleSecondaryFile(event.target.files?.[0])} className="rounded-lg border border-neutral-200 p-2.5 text-[11px] outline-hidden focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900" />
                 </div>
 
                 <div className="mt-auto flex gap-3 border-t border-neutral-150 pt-4">

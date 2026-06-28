@@ -83,13 +83,16 @@ adminRouter.get('/users', validate(z.object({
   })
 })), asyncHandler(async (req, res) => {
   const { search, page, limit } = req.validated.query;
-  const where = search ? {
-    OR: [
-      { firstName: { contains: search, mode: 'insensitive' } },
-      { lastName: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } }
-    ]
-  } : {};
+  const where = {
+    role: { not: 'admin' },
+    ...(search ? {
+      OR: [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } }
+      ]
+    } : {})
+  };
   const [users, total] = await Promise.all([
     prisma.user.findMany({
       where,
