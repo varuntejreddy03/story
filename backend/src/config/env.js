@@ -42,7 +42,8 @@ export const env = {
   b2BucketId: process.env.B2_BUCKET_ID,
   imageBaseUrl: process.env.IMAGE_BASE_URL || '',
   maxImageWidth: Number(process.env.MAX_IMAGE_WIDTH || 1200),
-  imageQuality: Number(process.env.IMAGE_QUALITY || 80)
+  imageQuality: Number(process.env.IMAGE_QUALITY || 80),
+  apiSecretKey: process.env.API_SECRET_KEY || ''
 };
 
 export const isProduction = env.nodeEnv === 'production';

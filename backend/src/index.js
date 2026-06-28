@@ -22,6 +22,17 @@ import { adminRouter } from './modules/admin/router.js';
 import { contactRouter, adminContactRouter } from './modules/contact/router.js';
 import { reviewsRouter, adminReviewsRouter } from './modules/reviews/router.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import {
+  apiKeyGuard,
+  loginLimiter,
+  registerLimiter,
+  transactionLimiter,
+  publicLimiter,
+  adminLimiter,
+  sanitizeInput,
+  extraSecurityHeaders,
+  requestId
+} from './middleware/security.js';
 
 const app = express();
 app.set('etag', false);
@@ -30,21 +41,23 @@ const uploadsDir = path.join(backendRoot, 'uploads');
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-    // Check exact match or starts-with (handles ports like :2087)
-    const allowed = env.origins.some(o => {
-      const base = o.replace(/\/$/, '');
-      return origin === base || origin.startsWith(base);
+    // Allow requests with no origin (server-to-server, curl, etc)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      ...env.origins,
+      process.env.FRONTEND_URL,
+      process.env.ADMIN_FRONTEND_URL
+    ].filter(Boolean).map(o => o.replace(/\/$/, ''));
+
+    // Exact match or same domain with any port
+    const isAllowed = allowedOrigins.some(allowed => {
+      const allowedDomain = allowed.replace(/^https?:\/\//, '').split(':')[0];
+      const originDomain = origin.replace(/^https?:\/\//, '').split(':')[0];
+      return origin === allowed || originDomain === allowedDomain;
     });
-    // Also allow any origin sharing the same domain as FRONTEND_URL
-    const frontendDomain = (process.env.FRONTEND_URL || '').replace(/^https?:\/\//, '').replace(/\/$/, '').split(':')[0];
-    if (allowed || (frontendDomain && origin.includes(frontendDomain))) {
-      callback(null, true);
-      return;
-    }
+
+    if (isAllowed) return callback(null, true);
     callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true
@@ -54,6 +67,9 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(cookieParser());
+app.use(requestId);
+app.use(extraSecurityHeaders);
+app.use(sanitizeInput);
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use('/uploads', express.static(uploadsDir, {
   etag: true,
@@ -77,6 +93,9 @@ app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), razo
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// API Key guard — all /api routes require valid key
+app.use('/api', apiKeyGuard);
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -99,26 +118,26 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api', apiLimiter);
-app.use('/api/products', productsRouter);
-app.use('/api/categories', categoriesRouter);
-app.use('/api/cart', cartRouter);
-app.use('/api/coupons', couponsRouter);
-app.use('/api/orders', ordersRouter);
-app.use('/api/payment', paymentRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/profile', profileRouter);
-app.use('/api/wishlist', wishlistRouter);
-app.use('/api/contact', contactRouter);
-app.use('/api/reviews', reviewsRouter);
+app.use('/api/products', publicLimiter, productsRouter);
+app.use('/api/categories', publicLimiter, categoriesRouter);
+app.use('/api/cart', transactionLimiter, cartRouter);
+app.use('/api/coupons', publicLimiter, couponsRouter);
+app.use('/api/orders', transactionLimiter, ordersRouter);
+app.use('/api/payment', transactionLimiter, paymentRouter);
+app.use('/api/settings', publicLimiter, settingsRouter);
+app.use('/api/profile', transactionLimiter, profileRouter);
+app.use('/api/wishlist', transactionLimiter, wishlistRouter);
+app.use('/api/contact', transactionLimiter, contactRouter);
+app.use('/api/reviews', publicLimiter, reviewsRouter);
 
-app.use('/api/admin/products', adminProductsRouter);
-app.use('/api/admin/categories', adminCategoriesRouter);
-app.use('/api/admin/coupons', adminCouponsRouter);
-app.use('/api/admin/orders', adminOrdersRouter);
-app.use('/api/admin/settings', adminSettingsRouter);
-app.use('/api/admin/contact-requests', adminContactRouter);
-app.use('/api/admin/reviews', adminReviewsRouter);
-app.use('/api/admin', adminRouter);
+app.use('/api/admin/products', adminLimiter, adminProductsRouter);
+app.use('/api/admin/categories', adminLimiter, adminCategoriesRouter);
+app.use('/api/admin/coupons', adminLimiter, adminCouponsRouter);
+app.use('/api/admin/orders', adminLimiter, adminOrdersRouter);
+app.use('/api/admin/settings', adminLimiter, adminSettingsRouter);
+app.use('/api/admin/contact-requests', adminLimiter, adminContactRouter);
+app.use('/api/admin/reviews', adminLimiter, adminReviewsRouter);
+app.use('/api/admin', adminLimiter, adminRouter);
 
 app.use(notFound);
 app.use(errorHandler);
