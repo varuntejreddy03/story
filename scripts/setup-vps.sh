@@ -69,7 +69,7 @@ if [ -d "story-ecom" ]; then
   echo "   Repository exists, pulling latest..."
   cd story-ecom && git pull origin main
 else
-  git clone https://github.com/varuntejreddy03/story.git story-ecom
+  git clone https://github.com/storyonline26/story.git story-ecom
   cd story-ecom
 fi
 echo "✅ Repository ready at /root/story-ecom"
