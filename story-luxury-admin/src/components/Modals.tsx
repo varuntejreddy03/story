@@ -600,7 +600,7 @@ export function AddCategoryModal({ isOpen, onClose, onAdd }: AddCategoryModalPro
   const [name, setName] = useState('');
 
   const [description, setDescription] = useState('');
-  const [imageUrl, setImageUrl] = useState(categoryPresets[0].url);
+  const [imageUrl, setImageUrl] = useState('');
   const [imageFile, setImageFile] = useState<File | undefined>();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -673,24 +673,12 @@ export function AddCategoryModal({ isOpen, onClose, onAdd }: AddCategoryModalPro
               </div>
 
               <div className="flex flex-col gap-3.5 border-t border-neutral-100 pt-4">
-                <label className="font-semibold text-neutral-700">Cover Image Source</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {categoryPresets.map((preset) => (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      onClick={() => {
-                        setImageFile(undefined);
-                        setImageUrl(preset.url);
-                      }}
-                      className={`h-12 rounded overflow-hidden border relative flex items-center justify-center bg-neutral-100 ${
-                        imageUrl === preset.url ? 'border-black ring-1 ring-black' : 'border-neutral-205'
-                      }`}
-                    >
-                      <img src={preset.url} alt={preset.name} className="object-cover w-full h-full grayscale" referrerPolicy="no-referrer" />
-                    </button>
-                  ))}
-                </div>
+                <label className="font-semibold text-neutral-700">Cover Image</label>
+                {imageUrl && (
+                  <div className="h-24 w-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100">
+                    <img src={imageUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                  </div>
+                )}
                 <input
                   type="file"
                   accept="image/*"
